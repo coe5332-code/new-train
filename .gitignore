@@ -209,7 +209,7 @@ marimo/_lsp/
 __marimo__/
 
 # Project-specific generated files
-output_videos/*.mp4
+# output_videos/*.mp4  # Commented out to allow tracking video files
 images/*.jpg
 images/*.png
 generated_pdfs/*.pdf
