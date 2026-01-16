@@ -87,7 +87,23 @@ def load_custom_css():
 
     /* Global Styles */
     .stApp {
-        background-color: var(--bg-primary);
+        background-color: var(--bg-primary) !important;
+    }
+    
+    /* Ensure main content area has proper background */
+    .main .block-container {
+        background-color: var(--bg-primary) !important;
+    }
+    
+    /* Fix text visibility in all markdown elements */
+    .stMarkdown, .stMarkdown p, .stMarkdown div {
+        color: var(--text-primary) !important;
+    }
+    
+    /* Ensure all text is visible */
+    body, .main {
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
     }
 
     /* Sidebar Styling */
@@ -165,7 +181,21 @@ def load_custom_css():
     }
 
     .stMarkdown {
-        color: var(--text-secondary) !important;
+        color: var(--text-primary) !important;
+    }
+    
+    /* Ensure all Streamlit text elements are visible */
+    .element-container, .stText, .stMarkdown p, .stMarkdown div {
+        color: var(--text-primary) !important;
+    }
+    
+    /* Fix warning/info/error message text visibility */
+    .stAlert, [data-baseweb="notification"] {
+        color: var(--text-primary) !important;
+    }
+    
+    .stAlert p, .stAlert div, [data-baseweb="notification"] p, [data-baseweb="notification"] div {
+        color: inherit !important;
     }
 
     /* Input Fields */
@@ -393,8 +423,10 @@ def load_custom_css():
     }
 
     [data-baseweb="notification"][kind="warning"] div,
-    .stWarning div {
+    [data-baseweb="notification"][kind="warning"] p,
+    .stWarning div, .stWarning p {
         color: var(--warning-text) !important;
+        font-weight: 600 !important;
     }
 
     /* Info Alert */
@@ -405,8 +437,10 @@ def load_custom_css():
     }
 
     [data-baseweb="notification"][kind="info"] div,
-    .stInfo div {
+    [data-baseweb="notification"][kind="info"] p,
+    .stInfo div, .stInfo p {
         color: var(--text-primary) !important;
+        font-weight: 500 !important;
     }
 
     /* Video Player */
@@ -491,12 +525,36 @@ def load_custom_css():
     }
 
     .status-box {
-        background-color: var(--bg-tertiary);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 1rem 1.5rem;
-        margin: 1rem 0;
-        font-weight: 500;
+        background-color: var(--bg-tertiary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 8px !important;
+        padding: 1rem 1.5rem !important;
+        margin: 1rem 0 !important;
+        font-weight: 500 !important;
+        color: var(--text-primary) !important;
+    }
+    
+    .status-box p, .status-box div, .status-box span {
+        color: var(--text-primary) !important;
+    }
+    
+    /* Ensure all warning/info/error messages have visible text */
+    .stWarning, .stInfo, .stError, .stSuccess {
+        color: var(--text-primary) !important;
+    }
+    
+    .stWarning p, .stInfo p, .stError p, .stSuccess p,
+    .stWarning div, .stInfo div, .stError div, .stSuccess div {
+        color: inherit !important;
+    }
+    
+    /* Fix Streamlit's default text colors */
+    [class*="st"] {
+        color: var(--text-primary) !important;
+    }
+    
+    /* Ensure form labels are visible */
+    label, .stTextInput label, .stTextArea label {
         color: var(--text-primary) !important;
     }
 
@@ -694,6 +752,12 @@ def show_create_video_page(selected_voice, uploaded_pdf):
     # ---------------- GENERATION LOGIC ----------------
     if submitted:
         try:
+            # Initialize session state for update confirmation
+            if "update_confirmed" not in st.session_state:
+                st.session_state.update_confirmed = False
+            if "pending_update" not in st.session_state:
+                st.session_state.pending_update = None
+            
             progress = st.progress(0, text="Initializing video generation...")
             status = st.empty()
 
@@ -702,7 +766,6 @@ def show_create_video_page(selected_voice, uploaded_pdf):
             pdf_bytes = None
             pdf_path = None
             service_version = None
-            update_confirmed = False
 
             # ==================================================
             # CASE 1: PDF EXISTS → IGNORE FORM + VERSION CHECK
@@ -723,36 +786,48 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                 status_check, existing_data = check_for_updates(service_name, file_hash)
                 
                 if status_check == "UPDATE_NEEDED" and existing_data:
-                    # Show update warning
-                    st.warning(f"""
-                    ⚠️ **Version Update Detected**
-                    
-                    A training video for **{service_name}** already exists (Version {existing_data.get('current_version', '1.0')}).
-                    
-                    The uploaded document has changes. Would you like to generate a new version?
-                    """)
-                    
-                    col_update, col_cancel = st.columns(2)
-                    with col_update:
-                        update_confirmed = st.button("✅ Generate New Version", type="primary", use_container_width=True)
-                    with col_cancel:
-                        if st.button("❌ Cancel", use_container_width=True):
-                            st.stop()
-                    
-                    if not update_confirmed:
-                        st.info("Generation cancelled. Upload a different document or proceed with the update.")
+                    # Check if this is the same update we're handling
+                    update_key = f"{service_name}_{file_hash}"
+                    if st.session_state.pending_update != update_key or not st.session_state.update_confirmed:
+                        # Show update warning
+                        st.warning(f"""
+                        ⚠️ **Version Update Detected**
+                        
+                        A training video for **{service_name}** already exists (Version {existing_data.get('current_version', '1.0')}).
+                        
+                        The uploaded document has changes. Would you like to generate a new version?
+                        """)
+                        
+                        col_update, col_cancel = st.columns(2)
+                        with col_update:
+                            if st.button("✅ Generate New Version", type="primary", use_container_width=True, key="pdf_update_btn"):
+                                st.session_state.update_confirmed = True
+                                st.session_state.pending_update = update_key
+                                st.rerun()
+                        with col_cancel:
+                            if st.button("❌ Cancel", use_container_width=True, key="pdf_cancel_btn"):
+                                st.session_state.update_confirmed = False
+                                st.session_state.pending_update = None
+                                st.stop()
+                        
+                        st.info("ℹ️ Please click 'Generate New Version' to proceed or 'Cancel' to abort.")
                         return
                     
-                    # Get next version number
+                    # User confirmed, proceed with update
                     from utils.version_utils import get_next_version
                     current_ver = existing_data.get('current_version', '1.0')
                     service_version = get_next_version(current_ver)
                     
                     st.success(f"🔄 Generating Version {service_version}...")
+                    # Reset confirmation for next time
+                    st.session_state.update_confirmed = False
+                    st.session_state.pending_update = None
                 
                 elif status_check == "UP_TO_DATE":
                     st.info(f"ℹ️ This document matches the existing version (v{existing_data.get('current_version', '1.0')}). Generating video with same content...")
                     service_version = existing_data.get('current_version', '1.0')
+                    st.session_state.update_confirmed = False
+                    st.session_state.pending_update = None
                 
                 # Save PDF to temp file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -799,36 +874,48 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                 status_check, existing_data = check_for_updates(service_name, file_hash)
                 
                 if status_check == "UPDATE_NEEDED" and existing_data:
-                    # Show update warning
-                    st.warning(f"""
-                    ⚠️ **Version Update Detected**
-                    
-                    A training video for **{service_name}** already exists (Version {existing_data.get('current_version', '1.0')}).
-                    
-                    The form content has changes. Would you like to generate a new version?
-                    """)
-                    
-                    col_update, col_cancel = st.columns(2)
-                    with col_update:
-                        update_confirmed = st.button("✅ Generate New Version", type="primary", use_container_width=True, key="form_update_btn")
-                    with col_cancel:
-                        if st.button("❌ Cancel", use_container_width=True, key="form_cancel_btn"):
-                            st.stop()
-                    
-                    if not update_confirmed:
-                        st.info("Generation cancelled. Modify the form or proceed with the update.")
+                    # Check if this is the same update we're handling
+                    update_key = f"{service_name}_{file_hash}"
+                    if st.session_state.pending_update != update_key or not st.session_state.update_confirmed:
+                        # Show update warning
+                        st.warning(f"""
+                        ⚠️ **Version Update Detected**
+                        
+                        A training video for **{service_name}** already exists (Version {existing_data.get('current_version', '1.0')}).
+                        
+                        The form content has changes. Would you like to generate a new version?
+                        """)
+                        
+                        col_update, col_cancel = st.columns(2)
+                        with col_update:
+                            if st.button("✅ Generate New Version", type="primary", use_container_width=True, key="form_update_btn"):
+                                st.session_state.update_confirmed = True
+                                st.session_state.pending_update = update_key
+                                st.rerun()
+                        with col_cancel:
+                            if st.button("❌ Cancel", use_container_width=True, key="form_cancel_btn"):
+                                st.session_state.update_confirmed = False
+                                st.session_state.pending_update = None
+                                st.stop()
+                        
+                        st.info("ℹ️ Please click 'Generate New Version' to proceed or 'Cancel' to abort.")
                         return
                     
-                    # Get next version number
+                    # User confirmed, proceed with update
                     from utils.version_utils import get_next_version
                     current_ver = existing_data.get('current_version', '1.0')
                     service_version = get_next_version(current_ver)
                     
                     st.success(f"🔄 Generating Version {service_version}...")
+                    # Reset confirmation for next time
+                    st.session_state.update_confirmed = False
+                    st.session_state.pending_update = None
                 
                 elif status_check == "UP_TO_DATE":
                     st.info(f"ℹ️ This content matches the existing version (v{existing_data.get('current_version', '1.0')}). Generating video with same content...")
                     service_version = existing_data.get('current_version', '1.0')
+                    st.session_state.update_confirmed = False
+                    st.session_state.pending_update = None
 
                 # Optional: show download button
                 with open(pdf_path, "rb") as f:
@@ -949,7 +1036,32 @@ def show_create_video_page(selected_voice, uploaded_pdf):
         if "service_version" in st.session_state:
             version = st.session_state["service_version"]
             service_data = st.session_state.get("service_data", {})
-            st.info(f"📌 **Version {version}** | Last Updated: {service_data.get('last_updated', 'N/A')[:10]}")
+            service_name_display = service_data.get('service_name', 'Service')
+            
+            # Create a prominent version badge
+            col_ver1, col_ver2, col_ver3 = st.columns([2, 2, 2])
+            with col_ver1:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            padding: 1rem; border-radius: 10px; text-align: center; color: white; font-weight: bold;">
+                    📌 Version {version}
+                </div>
+                """, unsafe_allow_html=True)
+            with col_ver2:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                            padding: 1rem; border-radius: 10px; text-align: center; color: white; font-weight: bold;">
+                    📋 {service_name_display}
+                </div>
+                """, unsafe_allow_html=True)
+            with col_ver3:
+                last_updated = service_data.get('last_updated', '')[:10] if service_data.get('last_updated') else 'N/A'
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                            padding: 1rem; border-radius: 10px; text-align: center; color: white; font-weight: bold;">
+                    📅 {last_updated}
+                </div>
+                """, unsafe_allow_html=True)
 
         with open(st.session_state["video_path"], "rb") as f:
             st.video(f.read())
@@ -1047,23 +1159,60 @@ def show_existing_videos_page():
                 if current_version:
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        st.metric("Current Version", f"v{current_version.get('version', 'N/A')}")
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                    padding: 1.5rem; border-radius: 15px; text-align: center; color: white;">
+                            <h3 style="margin: 0; color: white;">Current Version</h3>
+                            <p style="font-size: 2rem; margin: 0.5rem 0; font-weight: bold; color: white;">v{current_version.get('version', 'N/A')}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with col2:
-                        st.metric("Total Versions", len(history))
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                                    padding: 1.5rem; border-radius: 15px; text-align: center; color: white;">
+                            <h3 style="margin: 0; color: white;">Total Versions</h3>
+                            <p style="font-size: 2rem; margin: 0.5rem 0; font-weight: bold; color: white;">{len(history)}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with col3:
                         date_str = current_version.get('date', '')[:10] if current_version.get('date') else 'N/A'
-                        st.metric("Last Updated", date_str)
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                                    padding: 1.5rem; border-radius: 15px; text-align: center; color: white;">
+                            <h3 style="margin: 0; color: white;">Last Updated</h3>
+                            <p style="font-size: 1.2rem; margin: 0.5rem 0; font-weight: bold; color: white;">{date_str}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                 
                 # Version history table
                 if len(history) > 1:
-                    with st.expander("📜 View All Versions"):
-                        for idx, version_info in enumerate(history):
-                            version = version_info.get('version', 'N/A')
-                            date = version_info.get('date', '')[:10] if version_info.get('date') else 'N/A'
-                            is_current = version_info.get('is_current', False)
-                            
-                            status_badge = "🟢 Current" if is_current else "⚪ Archived"
-                            st.markdown(f"**Version {version}** {status_badge} | Updated: {date}")
+                    st.markdown("---")
+                    st.markdown("### 📜 All Versions")
+                    for idx, version_info in enumerate(history):
+                        version = version_info.get('version', 'N/A')
+                        date = version_info.get('date', '')[:10] if version_info.get('date') else 'N/A'
+                        is_current = version_info.get('is_current', False)
+                        
+                        if is_current:
+                            st.markdown(f"""
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                        padding: 1rem 1.5rem; border-radius: 10px; margin: 0.5rem 0; 
+                                        border-left: 5px solid #28a745;">
+                                <strong style="color: white; font-size: 1.1rem;">Version {version}</strong> 
+                                <span style="color: white; background: #28a745; padding: 0.2rem 0.5rem; border-radius: 5px; margin-left: 1rem; font-size: 0.9rem;">🟢 CURRENT</span>
+                                <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0;">Updated: {date}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"""
+                            <div style="background: var(--bg-secondary); 
+                                        padding: 1rem 1.5rem; border-radius: 10px; margin: 0.5rem 0; 
+                                        border-left: 5px solid var(--border-color); border: 1px solid var(--border-color);">
+                                <strong style="color: var(--text-primary); font-size: 1.1rem;">Version {version}</strong> 
+                                <span style="color: var(--text-secondary); background: var(--bg-tertiary); padding: 0.2rem 0.5rem; border-radius: 5px; margin-left: 1rem; font-size: 0.9rem;">⚪ Archived</span>
+                                <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">Updated: {date}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
             
             # Video selector for this service
             video_options = [v["file"] for v in service_videos]
