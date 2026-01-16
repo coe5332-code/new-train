@@ -269,7 +269,7 @@ def create_slide(title, points, image_path, audio_file):
 # -------------------------------------------------
 # COMBINE SLIDES (NO BLACK GAPS)
 # -------------------------------------------------
-def combine_slides_and_audio(video_clips, audio_paths, service_name=None):
+def combine_slides_and_audio(video_clips, audio_paths, service_name=None, version=None):
     # Smooth overlap between slides
     final_video = concatenate_videoclips(
         video_clips,
@@ -286,8 +286,11 @@ def combine_slides_and_audio(video_clips, audio_paths, service_name=None):
 
     filename = "bsk_training_video.mp4"
     if service_name:
-        safe = service_name.replace(" ", "_")
-        filename = f"BSK_Training_{safe}.mp4"
+        safe = service_name.replace(" ", "_").replace("/", "_").replace("\\", "_")
+        if version:
+            filename = f"BSK_Training_{safe}_v{version}.mp4"
+        else:
+            filename = f"BSK_Training_{safe}.mp4"
 
     output_path = os.path.join("output_videos", filename)
 

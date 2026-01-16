@@ -218,12 +218,7 @@ generated_pdfs/*.pdf
 *.tmp
 temp_*
 
-# Video repository - keep metadata but ignore large files
-video_repository/videos_metadata.json
-video_repository/categories.json
-
 # Keep directory structure but ignore contents
 !output_videos/.gitkeep
 !images/.gitkeep
 !generated_pdfs/.gitkeep
-!video_repository/.gitkeep

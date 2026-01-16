@@ -12,11 +12,10 @@ from services.gemini_service import generate_slides_from_raw
 from utils.avatar_utils import add_avatar_to_slide
 from utils.pdf_extractor import extract_raw_content
 from utils.pdf_utils import generate_service_pdf
-from utils.video_repository import (
-    register_video, initialize_repository, get_statistics,
-    increment_views, increment_downloads, update_rating, SERVICE_CATEGORIES
+from utils.version_utils import (
+    get_file_hash, check_for_updates, register_service_version,
+    get_service_info, get_version_history, normalize_service_name
 )
-from utils.recommendation_engine import RecommendationEngine
 
 logging.basicConfig(level=logging.INFO)
 
@@ -557,9 +556,6 @@ def main():
         initial_sidebar_state="expanded",
     )
 
-    # Initialize video repository
-    initialize_repository()
-
     # Load improved CSS
     load_custom_css()
 
@@ -578,7 +574,7 @@ def main():
 
         page = st.selectbox(
             "📑 Select Page:",
-            ["🎬 Create New Video", "📂 View Existing Videos", "🎯 Training Recommendations"],
+            ["🎬 Create New Video", "📂 View Existing Videos"],
             key="page_selector",
         )
 
@@ -610,10 +606,8 @@ def main():
     # ---------------- ROUTING ----------------
     if page == "🎬 Create New Video":
         show_create_video_page(selected_voice, uploaded_pdf)
-    elif page == "📂 View Existing Videos":
-        show_existing_videos_page()
     else:
-        show_recommendations_page()
+        show_existing_videos_page()
 
 
 # -------------------------------------------------
@@ -705,26 +699,71 @@ def show_create_video_page(selected_voice, uploaded_pdf):
 
             video_clips = []
             audio_paths = []
+            pdf_bytes = None
+            pdf_path = None
+            service_version = None
+            update_confirmed = False
 
             # ==================================================
-            # CASE 1: PDF EXISTS → IGNORE FORM
+            # CASE 1: PDF EXISTS → IGNORE FORM + VERSION CHECK
             # ==================================================
             if uploaded_pdf:
                 with status.container():
                     st.markdown('<div class="status-box">📄 Extracting content from PDF (form data ignored)...</div>', unsafe_allow_html=True)
 
+                # Read PDF bytes for hashing
+                uploaded_pdf.seek(0)
+                pdf_bytes = uploaded_pdf.read()
+                file_hash = get_file_hash(pdf_bytes)
+
+                # Use PDF filename as service name
+                service_name = uploaded_pdf.name.replace(".pdf", "").replace(".PDF", "")
+                
+                # Check for version updates
+                status_check, existing_data = check_for_updates(service_name, file_hash)
+                
+                if status_check == "UPDATE_NEEDED" and existing_data:
+                    # Show update warning
+                    st.warning(f"""
+                    ⚠️ **Version Update Detected**
+                    
+                    A training video for **{service_name}** already exists (Version {existing_data.get('current_version', '1.0')}).
+                    
+                    The uploaded document has changes. Would you like to generate a new version?
+                    """)
+                    
+                    col_update, col_cancel = st.columns(2)
+                    with col_update:
+                        update_confirmed = st.button("✅ Generate New Version", type="primary", use_container_width=True)
+                    with col_cancel:
+                        if st.button("❌ Cancel", use_container_width=True):
+                            st.stop()
+                    
+                    if not update_confirmed:
+                        st.info("Generation cancelled. Upload a different document or proceed with the update.")
+                        return
+                    
+                    # Get next version number
+                    from utils.version_utils import get_next_version
+                    current_ver = existing_data.get('current_version', '1.0')
+                    service_version = get_next_version(current_ver)
+                    
+                    st.success(f"🔄 Generating Version {service_version}...")
+                
+                elif status_check == "UP_TO_DATE":
+                    st.info(f"ℹ️ This document matches the existing version (v{existing_data.get('current_version', '1.0')}). Generating video with same content...")
+                    service_version = existing_data.get('current_version', '1.0')
+                
+                # Save PDF to temp file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                    tmp.write(uploaded_pdf.read())
+                    tmp.write(pdf_bytes)
                     pdf_path = tmp.name
 
                 pages = extract_raw_content(pdf_path)
                 raw_text = "\n".join(line for page in pages for line in page["lines"])
-                
-                # Use PDF filename as service name
-                service_name = uploaded_pdf.name.replace(".pdf", "")
 
             # ==================================================
-            # CASE 2: FORM → RAW TEXT
+            # CASE 2: FORM → RAW TEXT + VERSION CHECK
             # ==================================================
             else:
                 service_content = {
@@ -750,6 +789,46 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                 
                 progress.progress(10, text="Generating PDF document...")
                 pdf_path = generate_service_pdf(service_content)
+
+                # Read PDF for hashing
+                with open(pdf_path, "rb") as pdf_file:
+                    pdf_bytes = pdf_file.read()
+                    file_hash = get_file_hash(pdf_bytes)
+                
+                # Check for version updates
+                status_check, existing_data = check_for_updates(service_name, file_hash)
+                
+                if status_check == "UPDATE_NEEDED" and existing_data:
+                    # Show update warning
+                    st.warning(f"""
+                    ⚠️ **Version Update Detected**
+                    
+                    A training video for **{service_name}** already exists (Version {existing_data.get('current_version', '1.0')}).
+                    
+                    The form content has changes. Would you like to generate a new version?
+                    """)
+                    
+                    col_update, col_cancel = st.columns(2)
+                    with col_update:
+                        update_confirmed = st.button("✅ Generate New Version", type="primary", use_container_width=True, key="form_update_btn")
+                    with col_cancel:
+                        if st.button("❌ Cancel", use_container_width=True, key="form_cancel_btn"):
+                            st.stop()
+                    
+                    if not update_confirmed:
+                        st.info("Generation cancelled. Modify the form or proceed with the update.")
+                        return
+                    
+                    # Get next version number
+                    from utils.version_utils import get_next_version
+                    current_ver = existing_data.get('current_version', '1.0')
+                    service_version = get_next_version(current_ver)
+                    
+                    st.success(f"🔄 Generating Version {service_version}...")
+                
+                elif status_check == "UP_TO_DATE":
+                    st.info(f"ℹ️ This content matches the existing version (v{existing_data.get('current_version', '1.0')}). Generating video with same content...")
+                    service_version = existing_data.get('current_version', '1.0')
 
                 # Optional: show download button
                 with open(pdf_path, "rb") as f:
@@ -815,45 +894,40 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                 st.markdown('<div class="status-box">🎞️ Rendering final video...</div>', unsafe_allow_html=True)
             
             progress.progress(90, text="Finalizing video...")
+            
+            # Determine final service name and version
+            final_service_name = service_name or "BSK_Service"
             final_path = combine_slides_and_audio(
-                video_clips, audio_paths, service_name=service_name or "BSK_Service"
+                video_clips, audio_paths, 
+                service_name=final_service_name,
+                version=service_version
             )
 
-            progress.progress(100, text="✅ Complete!")
+            # Register service version in registry
+            if pdf_bytes:
+                file_hash = get_file_hash(pdf_bytes)
+            else:
+                # For form-based generation, create hash from content
+                content_str = f"{service_name}{service_description}{how_to_apply}"
+                file_hash = get_file_hash(content_str.encode('utf-8'))
             
-            # Register video in repository
-            try:
-                from moviepy.editor import VideoFileClip
-                video_clip = VideoFileClip(final_path)
-                duration = video_clip.duration
-                video_clip.close()
-            except:
-                duration = 0.0
-            
-            service_content_for_repo = {
-                "service_name": service_name or "BSK_Service",
-                "service_description": service_description if not uploaded_pdf else "",
-                "how_to_apply": how_to_apply if not uploaded_pdf else "",
-                "eligibility_criteria": eligibility_criteria if not uploaded_pdf else "",
-                "required_docs": required_docs if not uploaded_pdf else "",
-                "operator_tips": operator_tips if not uploaded_pdf else "",
-                "troubleshooting": troubleshooting if not uploaded_pdf else "",
-                "service_link": service_link if not uploaded_pdf else "",
-                "fees_and_timeline": fees_and_timeline if not uploaded_pdf else "",
-            }
-            
-            video_metadata = register_video(
+            service_data = register_service_version(
+                service_name=final_service_name,
+                file_hash=file_hash,
                 video_path=final_path,
-                service_name=service_name or "BSK_Service",
-                service_content=service_content_for_repo,
-                slides_count=len(slides),
-                duration=duration,
-                voice=selected_voice
+                pdf_path=pdf_path,
+                source_type="uploaded" if uploaded_pdf else "generated"
             )
             
+            # Update service_version if it wasn't set
+            if not service_version:
+                service_version = service_data.get('current_version', '1.0')
+
+            progress.progress(100, text="✅ Complete!")
             st.session_state["video_path"] = final_path
-            st.session_state["video_metadata"] = video_metadata
             st.session_state["audio_paths"] = audio_paths
+            st.session_state["service_version"] = service_version
+            st.session_state["service_data"] = service_data
 
             status.empty()
             progress.empty()
@@ -870,6 +944,12 @@ def show_create_video_page(selected_voice, uploaded_pdf):
     if "video_path" in st.session_state:
         st.markdown("---")
         st.markdown("## 🎬 Generated Training Video")
+        
+        # Show version info if available
+        if "service_version" in st.session_state:
+            version = st.session_state["service_version"]
+            service_data = st.session_state.get("service_data", {})
+            st.info(f"📌 **Version {version}** | Last Updated: {service_data.get('last_updated', 'N/A')[:10]}")
 
         with open(st.session_state["video_path"], "rb") as f:
             st.video(f.read())
@@ -899,356 +979,163 @@ def show_existing_videos_page():
     st.markdown("**Browse and view previously generated training videos**")
     st.markdown("---")
 
-    initialize_repository()
-    from utils.video_repository import get_all_videos
+    # Load version registry
+    from utils.version_utils import get_all_services, get_version_history
     
-    videos_metadata = get_all_videos()
-    
-    if not videos_metadata:
+    output_dir = "output_videos"
+    if not os.path.exists(output_dir):
         st.info("📭 No videos found. Create your first video to get started!")
         return
 
-    st.success(f"✅ Found {len(videos_metadata)} training video(s)")
+    videos = sorted([f for f in os.listdir(output_dir) if f.endswith(".mp4")], reverse=True)
     
-    # Create a mapping for selectbox
-    video_options = {f"{v['service_name']} ({v.get('category', 'general')})": v for v in videos_metadata}
-    selected_label = st.selectbox(
-        "Select a video to view:",
-        list(video_options.keys())
-    )
+    if not videos:
+        st.info("📭 No videos available yet. Generate some videos first!")
+        return
+
+    # Get all registered services
+    services = get_all_services()
     
-    if selected_label:
-        selected_video = video_options[selected_label]
-        video_path = selected_video.get("file_path")
+    # Group videos by service
+    service_groups = {}
+    unregistered_videos = []
+    
+    for video_file in videos:
+        video_path = os.path.join(output_dir, video_file)
+        matched = False
         
-        if video_path and os.path.exists(video_path):
-            # Increment views
-            increment_views(selected_video.get("video_id"))
+        # Try to match with registered services
+        for normalized_name, service_data in services.items():
+            if service_data.get("video_path") == video_path:
+                service_name = service_data.get("service_name", normalized_name)
+                if service_name not in service_groups:
+                    service_groups[service_name] = []
+                service_groups[service_name].append({
+                    "file": video_file,
+                    "path": video_path,
+                    "data": service_data
+                })
+                matched = True
+                break
+        
+        if not matched:
+            unregistered_videos.append(video_file)
+    
+    # Display service groups
+    if service_groups:
+        st.success(f"✅ Found {len(services)} registered service(s) with {len(videos)} video(s)")
+        
+        # Service selector
+        service_names = sorted(service_groups.keys())
+        selected_service = st.selectbox(
+            "📋 Select a Service:",
+            service_names,
+            format_func=lambda x: f"{x} ({len(service_groups[x])} version(s))"
+        )
+        
+        if selected_service:
+            service_videos = service_groups[selected_service]
+            
+            # Get version history
+            history = get_version_history(selected_service)
+            
+            # Show version info
+            if history:
+                st.markdown("### 📊 Version History")
+                current_version = history[0] if history else None
+                
+                if current_version:
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Current Version", f"v{current_version.get('version', 'N/A')}")
+                    with col2:
+                        st.metric("Total Versions", len(history))
+                    with col3:
+                        date_str = current_version.get('date', '')[:10] if current_version.get('date') else 'N/A'
+                        st.metric("Last Updated", date_str)
+                
+                # Version history table
+                if len(history) > 1:
+                    with st.expander("📜 View All Versions"):
+                        for idx, version_info in enumerate(history):
+                            version = version_info.get('version', 'N/A')
+                            date = version_info.get('date', '')[:10] if version_info.get('date') else 'N/A'
+                            is_current = version_info.get('is_current', False)
+                            
+                            status_badge = "🟢 Current" if is_current else "⚪ Archived"
+                            st.markdown(f"**Version {version}** {status_badge} | Updated: {date}")
+            
+            # Video selector for this service
+            video_options = [v["file"] for v in service_videos]
+            selected_video = st.selectbox(
+                "🎥 Select Version:",
+                video_options,
+                format_func=lambda x: x.replace("_", " ").replace(".mp4", "")
+            )
+            
+            if selected_video:
+                selected_video_data = next(v for v in service_videos if v["file"] == selected_video)
+                path = selected_video_data["path"]
+                
+                st.markdown("### 🎥 Video Preview")
+                with open(path, "rb") as f:
+                    video_bytes = f.read()
+                    st.video(video_bytes)
+                
+                # File info
+                file_size = os.path.getsize(path) / (1024 * 1024)  # Convert to MB
+                video_data = selected_video_data.get("data", {})
+                version = video_data.get("current_version", "N/A")
+                
+                col_info1, col_info2 = st.columns(2)
+                with col_info1:
+                    st.caption(f"📊 File size: {file_size:.2f} MB")
+                with col_info2:
+                    st.caption(f"📌 Version: {version}")
+                
+                st.download_button(
+                    "📥 Download This Video",
+                    data=open(path, "rb").read(),
+                    file_name=selected_video,
+                    mime="video/mp4",
+                    use_container_width=True
+                )
+    else:
+        # Fallback to simple list if no registry
+        st.success(f"✅ Found {len(videos)} training video(s)")
+        
+        selected = st.selectbox(
+            "Select a video to view:",
+            videos,
+            format_func=lambda x: x.replace("_", " ").replace(".mp4", "")
+        )
+        
+        if selected:
+            path = os.path.join(output_dir, selected)
             
             st.markdown("### 🎥 Video Preview")
-            with open(video_path, "rb") as f:
+            with open(path, "rb") as f:
                 video_bytes = f.read()
                 st.video(video_bytes)
             
-            # Video metadata
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Views", selected_video.get("views", 0))
-            with col2:
-                st.metric("Downloads", selected_video.get("downloads", 0))
-            with col3:
-                rating = selected_video.get("rating", 0.0)
-                st.metric("Rating", f"{rating:.1f} ⭐" if rating > 0 else "Not rated")
-            with col4:
-                st.metric("Slides", selected_video.get("slides_count", 0))
-            
-            # Category and tags
-            category_info = SERVICE_CATEGORIES.get(selected_video.get("category", "general"), {})
-            st.markdown(f"**Category:** {category_info.get('icon', '📋')} {category_info.get('name', 'General Services')}")
-            
-            tags = selected_video.get("tags", [])
-            if tags:
-                tag_display = " ".join([f"`{tag}`" for tag in tags[:5]])
-                st.markdown(f"**Tags:** {tag_display}")
-            
             # File info
-            file_size = os.path.getsize(video_path) / (1024 * 1024)  # Convert to MB
-            st.caption(f"📊 File size: {file_size:.2f} MB | Created: {selected_video.get('created_at', 'Unknown')[:10]}")
+            file_size = os.path.getsize(path) / (1024 * 1024)  # Convert to MB
+            st.caption(f"📊 File size: {file_size:.2f} MB")
             
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                video_id = selected_video.get("video_id")
-                with open(video_path, "rb") as f:
-                    video_data = f.read()
-                if st.download_button(
-                    "📥 Download This Video",
-                    data=video_data,
-                    file_name=os.path.basename(video_path),
-                    mime="video/mp4",
-                    use_container_width=True
-                ):
-                    increment_downloads(video_id)
-            with col2:
-                # Rating widget
-                if st.button("⭐ Rate Video", use_container_width=True):
-                    st.session_state["rate_video_id"] = selected_video.get("video_id")
-            
-            # Rating input
-            if st.session_state.get("rate_video_id") == selected_video.get("video_id"):
-                rating_value = st.slider("Rate this video (1-5 stars)", 1, 5, 3)
-                if st.button("Submit Rating"):
-                    update_rating(selected_video.get("video_id"), float(rating_value))
-                    st.success("✅ Rating submitted!")
-                    st.session_state.pop("rate_video_id", None)
-                    st.rerun()
-        else:
-            st.error("Video file not found. It may have been deleted.")
-
-
-# -------------------------------------------------
-# RECOMMENDATIONS PAGE
-# -------------------------------------------------
-def show_recommendations_page():
-    st.title("🎯 Training Recommendations for BSK Operators")
-    st.markdown("**Discover personalized training videos based on your needs**")
-    st.markdown("---")
-    
-    initialize_repository()
-    engine = RecommendationEngine()
-    engine.refresh()
-    
-    # Statistics banner
-    stats = get_statistics()
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Videos", stats["total_videos"])
-    with col2:
-        st.metric("Total Views", stats["total_views"])
-    with col3:
-        st.metric("Total Downloads", stats["total_downloads"])
-    with col4:
-        st.metric("Avg Rating", f"{stats['average_rating']:.1f} ⭐")
-    
-    st.markdown("---")
-    
-    # Recommendation tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🏆 Popular Videos", 
-        "📚 By Category", 
-        "🔍 Search", 
-        "👤 Personalized", 
-        "⭐ Highly Rated"
-    ])
-    
-    # Tab 1: Popular Videos
-    with tab1:
-        st.markdown("### 🏆 Most Popular Training Videos")
-        st.caption("Videos with the most views and downloads")
-        
-        popular_videos = engine.recommend_popular(limit=10)
-        
-        if not popular_videos:
-            st.info("No videos available yet. Create some training videos first!")
-        else:
-            for i, video in enumerate(popular_videos, 1):
-                with st.container():
-                    col1, col2 = st.columns([1, 3])
-                    
-                    with col1:
-                        video_path = video.get("file_path")
-                        if video_path and os.path.exists(video_path):
-                            with open(video_path, "rb") as f:
-                                st.video(f.read(), start_time=0)
-                    
-                    with col2:
-                        category_info = SERVICE_CATEGORIES.get(video.get("category", "general"), {})
-                        st.markdown(f"#### {i}. {video.get('service_name', 'Unknown Service')}")
-                        st.markdown(f"**{category_info.get('icon', '📋')} {category_info.get('name', 'General')}**")
-                        st.markdown(f"*{video.get('description', 'No description')[:150]}...*")
-                        
-                        # Metrics
-                        metric_col1, metric_col2, metric_col3 = st.columns(3)
-                        with metric_col1:
-                            st.caption(f"👁️ {video.get('views', 0)} views")
-                        with metric_col2:
-                            st.caption(f"⭐ {video.get('rating', 0.0):.1f} rating")
-                        with metric_col3:
-                            st.caption(f"📊 {video.get('slides_count', 0)} slides")
-                        
-                        # Actions
-                        action_col1, action_col2 = st.columns(2)
-                        with action_col1:
-                            if st.button(f"📥 Download", key=f"dl_pop_{video.get('video_id')}"):
-                                increment_downloads(video.get("video_id"))
-                                with open(video_path, "rb") as f:
-                                    st.download_button(
-                                        "Click to Download",
-                                        data=f.read(),
-                                        file_name=os.path.basename(video_path),
-                                        mime="video/mp4"
-                                    )
-                        with action_col2:
-                            if st.button(f"👁️ View Details", key=f"view_pop_{video.get('video_id')}"):
-                                st.session_state["selected_video_id"] = video.get("video_id")
-                                st.rerun()
-                    
-                    st.markdown("---")
-    
-    # Tab 2: By Category
-    with tab2:
-        st.markdown("### 📚 Browse by Service Category")
-        
-        category_recommendations = engine.get_category_recommendations()
-        
-        if not category_recommendations:
-            st.info("No videos available yet. Create some training videos first!")
-        else:
-            selected_category = st.selectbox(
-                "Select a category:",
-                list(category_recommendations.keys()),
-                format_func=lambda x: f"{SERVICE_CATEGORIES.get(x, {}).get('icon', '📋')} {SERVICE_CATEGORIES.get(x, {}).get('name', x)}"
+            st.download_button(
+                "📥 Download This Video",
+                data=open(path, "rb").read(),
+                file_name=selected,
+                mime="video/mp4",
+                use_container_width=True
             )
-            
-            if selected_category:
-                category_videos = category_recommendations[selected_category]
-                category_info = SERVICE_CATEGORIES.get(selected_category, {})
-                
-                st.markdown(f"### {category_info.get('icon', '📋')} {category_info.get('name', 'Category')}")
-                
-                for video in category_videos:
-                    with st.expander(f"▶️ {video.get('service_name', 'Unknown')} - {video.get('rating', 0.0):.1f}⭐"):
-                        video_path = video.get("file_path")
-                        if video_path and os.path.exists(video_path):
-                            st.video(video_path)
-                            st.markdown(f"**Description:** {video.get('description', 'No description')}")
-                            st.markdown(f"**Views:** {video.get('views', 0)} | **Downloads:** {video.get('downloads', 0)}")
-                            
-                            if st.button(f"📥 Download", key=f"dl_cat_{video.get('video_id')}"):
-                                increment_downloads(video.get("video_id"))
-                                with open(video_path, "rb") as f:
-                                    st.download_button(
-                                        "Click to Download",
-                                        data=f.read(),
-                                        file_name=os.path.basename(video_path),
-                                        mime="video/mp4"
-                                    )
     
-    # Tab 3: Search
-    with tab3:
-        st.markdown("### 🔍 Search Training Videos")
-        
-        search_query = st.text_input("Search by service name, description, or keywords:", placeholder="e.g., Aadhaar, Education, Healthcare...")
-        
-        if search_query:
-            search_results = engine.search_videos(search_query, limit=10)
-            
-            if search_results:
-                st.success(f"Found {len(search_results)} matching video(s)")
-                
-                for video in search_results:
-                    with st.expander(f"▶️ {video.get('service_name', 'Unknown')} (Match: {video.get('search_score', 0)})"):
-                        video_path = video.get("file_path")
-                        if video_path and os.path.exists(video_path):
-                            st.video(video_path)
-                            st.markdown(f"**Description:** {video.get('description', 'No description')}")
-                            st.markdown(f"**Category:** {SERVICE_CATEGORIES.get(video.get('category', 'general'), {}).get('name', 'General')}")
-                            
-                            if st.button(f"📥 Download", key=f"dl_search_{video.get('video_id')}"):
-                                increment_downloads(video.get("video_id"))
-                                with open(video_path, "rb") as f:
-                                    st.download_button(
-                                        "Click to Download",
-                                        data=f.read(),
-                                        file_name=os.path.basename(video_path),
-                                        mime="video/mp4"
-                                    )
-            else:
-                st.info("No videos found matching your search.")
-        else:
-            st.info("Enter a search query to find training videos.")
-    
-    # Tab 4: Personalized
-    with tab4:
-        st.markdown("### 👤 Personalized Recommendations")
-        st.caption("Get recommendations based on your experience level and preferences")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            operator_level = st.selectbox(
-                "Your Experience Level:",
-                ["beginner", "intermediate", "advanced"],
-                help="Select your current skill level as a BSK operator"
-            )
-        
-        with col2:
-            preferred_categories = st.multiselect(
-                "Preferred Categories:",
-                list(SERVICE_CATEGORIES.keys()),
-                format_func=lambda x: f"{SERVICE_CATEGORIES.get(x, {}).get('icon', '📋')} {SERVICE_CATEGORIES.get(x, {}).get('name', x)}",
-                help="Select categories you're interested in"
-            )
-        
-        if st.button("🎯 Get Personalized Recommendations", use_container_width=True):
-            personalized = engine.get_personalized_recommendations(
-                operator_level=operator_level,
-                preferred_categories=preferred_categories,
-                limit=10
-            )
-            
-            if personalized:
-                st.success(f"Found {len(personalized)} personalized recommendations for you!")
-                
-                for i, video in enumerate(personalized, 1):
-                    with st.container():
-                        col1, col2 = st.columns([1, 3])
-                        
-                        with col1:
-                            video_path = video.get("file_path")
-                            if video_path and os.path.exists(video_path):
-                                with open(video_path, "rb") as f:
-                                    st.video(f.read(), start_time=0)
-                        
-                        with col2:
-                            category_info = SERVICE_CATEGORIES.get(video.get("category", "general"), {})
-                            st.markdown(f"#### {i}. {video.get('service_name', 'Unknown Service')}")
-                            st.markdown(f"**{category_info.get('icon', '📋')} {category_info.get('name', 'General')}** | Match Score: {video.get('personalized_score', 0):.1f}")
-                            st.markdown(f"*{video.get('description', 'No description')[:150]}...*")
-                            
-                            if st.button(f"📥 Download", key=f"dl_pers_{video.get('video_id')}"):
-                                increment_downloads(video.get("video_id"))
-                                with open(video_path, "rb") as f:
-                                    st.download_button(
-                                        "Click to Download",
-                                        data=f.read(),
-                                        file_name=os.path.basename(video_path),
-                                        mime="video/mp4"
-                                    )
-                        
-                        st.markdown("---")
-            else:
-                st.info("No personalized recommendations available. Try adjusting your preferences.")
-    
-    # Tab 5: Highly Rated
-    with tab5:
-        st.markdown("### ⭐ Highly Rated Training Videos")
-        st.caption("Videos with the best ratings from BSK operators")
-        
-        highly_rated = engine.recommend_highly_rated(min_rating=4.0, limit=10)
-        
-        if not highly_rated:
-            st.info("No highly rated videos yet. Be the first to rate a video!")
-        else:
-            for i, video in enumerate(highly_rated, 1):
-                with st.container():
-                    col1, col2 = st.columns([1, 3])
-                    
-                    with col1:
-                        video_path = video.get("file_path")
-                        if video_path and os.path.exists(video_path):
-                            with open(video_path, "rb") as f:
-                                st.video(f.read(), start_time=0)
-                    
-                    with col2:
-                        category_info = SERVICE_CATEGORIES.get(video.get("category", "general"), {})
-                        rating = video.get("rating", 0.0)
-                        ratings_count = video.get("ratings_count", 0)
-                        
-                        st.markdown(f"#### {i}. {video.get('service_name', 'Unknown Service')}")
-                        st.markdown(f"**{category_info.get('icon', '📋')} {category_info.get('name', 'General')}** | ⭐ {rating:.1f} ({ratings_count} ratings)")
-                        st.markdown(f"*{video.get('description', 'No description')[:150]}...*")
-                        
-                        if st.button(f"📥 Download", key=f"dl_rated_{video.get('video_id')}"):
-                            increment_downloads(video.get("video_id"))
-                            with open(video_path, "rb") as f:
-                                st.download_button(
-                                    "Click to Download",
-                                    data=f.read(),
-                                    file_name=os.path.basename(video_path),
-                                    mime="video/mp4"
-                                )
-                    
-                    st.markdown("---")
+    # Show unregistered videos if any
+    if unregistered_videos:
+        with st.expander("📦 Unregistered Videos (Legacy)"):
+            st.info(f"Found {len(unregistered_videos)} video(s) not in version registry")
+            for video_file in unregistered_videos:
+                st.text(f"• {video_file}")
 
 
 # -------------------------------------------------
