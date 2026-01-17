@@ -776,18 +776,19 @@ def show_create_video_page(selected_voice, uploaded_pdf):
             # ==================================================
             # RESTORE DATA IF CONTINUING AFTER "GENERATE NEW VERSION"
             # ==================================================
+            gen_data = None
             if should_continue_generation:
                 # Restore stored data from previous submission
                 gen_data = st.session_state.pending_generation_data
                 uploaded_pdf = gen_data.get("uploaded_pdf")
                 if gen_data.get("pdf_bytes"):
-                    # Create a file-like object from stored bytes for PDF case
-                    import io
+                    # PDF upload case - restore PDF bytes
                     pdf_bytes = gen_data["pdf_bytes"]
                     pdf_path = gen_data.get("pdf_path")
-                    service_name = gen_data.get("service_name")
+                    service_name = gen_data.get("service_name", "Service")
+                    is_pdf_continuation = True
                 else:
-                    # Use stored form data
+                    # Form input case - restore form fields
                     service_name = gen_data.get("service_name")
                     service_description = gen_data.get("service_description")
                     how_to_apply = gen_data.get("how_to_apply")
@@ -797,13 +798,15 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                     troubleshooting = gen_data.get("troubleshooting")
                     service_link = gen_data.get("service_link")
                     fees_and_timeline = gen_data.get("fees_and_timeline")
-                    uploaded_pdf = None  # Clear uploaded_pdf so form path is used
-                    # DON'T reset update_confirmed here - keep it True for version check
+                    uploaded_pdf = None
+                    is_pdf_continuation = False
+            else:
+                is_pdf_continuation = False
 
             # ==================================================
             # CASE 1: PDF EXISTS → IGNORE FORM + VERSION CHECK
             # ==================================================
-            if uploaded_pdf or (should_continue_generation and gen_data.get("pdf_bytes")):
+            if uploaded_pdf or (should_continue_generation and is_pdf_continuation):
                 with status.container():
                     st.markdown('<div class="status-box">📄 Extracting content from PDF (form data ignored)...</div>', unsafe_allow_html=True)
 
@@ -877,11 +880,17 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                     st.session_state.pending_generation_data = None
                 
                 # Save PDF to temp file (if not already saved)
-                if should_continue_generation and gen_data.get("pdf_path") and os.path.exists(gen_data["pdf_path"]):
-                    # Use existing PDF path if available
-                    pdf_path = gen_data["pdf_path"]
+                if should_continue_generation:
+                    if gen_data and gen_data.get("pdf_path") and os.path.exists(gen_data["pdf_path"]):
+                        # Use existing PDF path if available
+                        pdf_path = gen_data["pdf_path"]
+                    else:
+                        # Re-save PDF from stored bytes
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                            tmp.write(pdf_bytes)
+                            pdf_path = tmp.name
                 else:
-                    # Save PDF to temp file
+                    # Save new PDF upload to temp file
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                         tmp.write(pdf_bytes)
                         pdf_path = tmp.name
@@ -893,16 +902,21 @@ def show_create_video_page(selected_voice, uploaded_pdf):
             # CASE 2: FORM → RAW TEXT + VERSION CHECK
             # ==================================================
             else:
-                # If continuing with stored data, use stored PDF path if available
-                if should_continue_generation and gen_data.get("pdf_path") and os.path.exists(gen_data["pdf_path"]):
-                    pdf_path = gen_data["pdf_path"]
-                    # Read PDF for hashing
-                    with open(pdf_path, "rb") as pdf_file:
-                        pdf_bytes = pdf_file.read()
-                    file_hash = get_file_hash(pdf_bytes)
-                    # Skip PDF generation and validation if continuing
-                    skip_pdf_generation = True
-                else:
+                # If continuing with stored form data, use stored PDF path if available
+                skip_pdf_generation = False
+                if should_continue_generation:
+                    if gen_data and gen_data.get("pdf_path") and os.path.exists(gen_data["pdf_path"]):
+                        # Use existing PDF from previous generation
+                        pdf_path = gen_data["pdf_path"]
+                        with open(pdf_path, "rb") as pdf_file:
+                            pdf_bytes = pdf_file.read()
+                        file_hash = get_file_hash(pdf_bytes)
+                        skip_pdf_generation = True
+                    else:
+                        # PDF was deleted, regenerate from form data (already restored above)
+                        skip_pdf_generation = False
+                
+                if not skip_pdf_generation:
                     service_content = {
                         "service_name": service_name,
                         "service_description": service_description,
