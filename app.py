@@ -803,17 +803,22 @@ def show_create_video_page(selected_voice, uploaded_pdf):
             # ==================================================
             # CASE 1: PDF EXISTS → IGNORE FORM + VERSION CHECK
             # ==================================================
-            if uploaded_pdf or (should_continue_generation and pdf_bytes):
+            if uploaded_pdf or (should_continue_generation and gen_data.get("pdf_bytes")):
                 with status.container():
                     st.markdown('<div class="status-box">📄 Extracting content from PDF (form data ignored)...</div>', unsafe_allow_html=True)
 
-                # Read PDF bytes for hashing
-                uploaded_pdf.seek(0)
-                pdf_bytes = uploaded_pdf.read()
+                # Handle PDF bytes - either from upload or from stored data
+                if should_continue_generation and gen_data.get("pdf_bytes"):
+                    # Continuing from stored PDF bytes
+                    pdf_bytes = gen_data["pdf_bytes"]
+                    service_name = gen_data.get("service_name", "Service")
+                else:
+                    # New PDF upload
+                    uploaded_pdf.seek(0)
+                    pdf_bytes = uploaded_pdf.read()
+                    service_name = uploaded_pdf.name.replace(".pdf", "").replace(".PDF", "")
+                
                 file_hash = get_file_hash(pdf_bytes)
-
-                # Use PDF filename as service name
-                service_name = uploaded_pdf.name.replace(".pdf", "").replace(".PDF", "")
                 
                 # Check for version updates
                 status_check, existing_data = check_for_updates(service_name, file_hash)
@@ -872,12 +877,11 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                     st.session_state.pending_generation_data = None
                 
                 # Save PDF to temp file (if not already saved)
-                if not pdf_path:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                        tmp.write(pdf_bytes)
-                        pdf_path = tmp.name
-                elif should_continue_generation and pdf_bytes:
-                    # Re-save PDF if we're continuing with stored bytes
+                if should_continue_generation and gen_data.get("pdf_path") and os.path.exists(gen_data["pdf_path"]):
+                    # Use existing PDF path if available
+                    pdf_path = gen_data["pdf_path"]
+                else:
+                    # Save PDF to temp file
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                         tmp.write(pdf_bytes)
                         pdf_path = tmp.name
@@ -941,6 +945,7 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                         st.success(f"🔄 Generating Version {service_version}...")
                     else:
                         service_version = "1.0"
+                    # Skip version check dialog since user already confirmed
                 else:
                     status_check, existing_data = check_for_updates(service_name, file_hash)
                 
