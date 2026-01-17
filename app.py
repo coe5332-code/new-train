@@ -777,31 +777,31 @@ def show_create_video_page(selected_voice, uploaded_pdf):
             # RESTORE DATA IF CONTINUING AFTER "GENERATE NEW VERSION"
             # ==================================================
             gen_data = None
+            is_pdf_continuation = False
             if should_continue_generation:
                 # Restore stored data from previous submission
                 gen_data = st.session_state.pending_generation_data
-                uploaded_pdf = gen_data.get("uploaded_pdf")
-                if gen_data.get("pdf_bytes"):
-                    # PDF upload case - restore PDF bytes
-                    pdf_bytes = gen_data["pdf_bytes"]
-                    pdf_path = gen_data.get("pdf_path")
-                    service_name = gen_data.get("service_name", "Service")
-                    is_pdf_continuation = True
-                else:
-                    # Form input case - restore form fields
-                    service_name = gen_data.get("service_name")
-                    service_description = gen_data.get("service_description")
-                    how_to_apply = gen_data.get("how_to_apply")
-                    eligibility_criteria = gen_data.get("eligibility_criteria")
-                    required_docs = gen_data.get("required_docs")
-                    operator_tips = gen_data.get("operator_tips")
-                    troubleshooting = gen_data.get("troubleshooting")
-                    service_link = gen_data.get("service_link")
-                    fees_and_timeline = gen_data.get("fees_and_timeline")
-                    uploaded_pdf = None
-                    is_pdf_continuation = False
-            else:
-                is_pdf_continuation = False
+                if gen_data:
+                    uploaded_pdf = gen_data.get("uploaded_pdf")
+                    if gen_data.get("pdf_bytes"):
+                        # PDF upload case - restore PDF bytes
+                        pdf_bytes = gen_data["pdf_bytes"]
+                        pdf_path = gen_data.get("pdf_path")
+                        service_name = gen_data.get("service_name", "Service")
+                        is_pdf_continuation = True
+                    else:
+                        # Form input case - restore form fields
+                        service_name = gen_data.get("service_name", "")
+                        service_description = gen_data.get("service_description", "")
+                        how_to_apply = gen_data.get("how_to_apply", "")
+                        eligibility_criteria = gen_data.get("eligibility_criteria", "")
+                        required_docs = gen_data.get("required_docs", "")
+                        operator_tips = gen_data.get("operator_tips", "")
+                        troubleshooting = gen_data.get("troubleshooting", "")
+                        service_link = gen_data.get("service_link", "")
+                        fees_and_timeline = gen_data.get("fees_and_timeline", "")
+                        uploaded_pdf = None
+                        is_pdf_continuation = False
 
             # ==================================================
             # CASE 1: PDF EXISTS → IGNORE FORM + VERSION CHECK
@@ -1023,15 +1023,16 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                     st.session_state.pending_update = None
                     st.session_state.pending_generation_data = None
 
-                # Optional: show download button
-                with open(pdf_path, "rb") as f:
-                    st.download_button(
-                        "📥 Download Training PDF",
-                        data=f.read(),
-                        file_name=os.path.basename(pdf_path),
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
+                # Optional: show download button (only if not continuing or PDF exists)
+                if pdf_path and os.path.exists(pdf_path) and not should_continue_generation:
+                    with open(pdf_path, "rb") as f:
+                        st.download_button(
+                            "📥 Download Training PDF",
+                            data=f.read(),
+                            file_name=os.path.basename(pdf_path),
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
 
                 # 2️⃣ Extract text from the saved PDF (if not already extracted)
                 if 'raw_text' not in locals() or not raw_text:
