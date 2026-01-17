@@ -750,7 +750,13 @@ def show_create_video_page(selected_voice, uploaded_pdf):
         submitted = st.form_submit_button("🚀 Generate Training Video", use_container_width=True)
 
     # ---------------- GENERATION LOGIC ----------------
-    if submitted:
+    # Check if we're continuing after "Generate New Version" was clicked
+    should_continue_generation = (
+        st.session_state.get("update_confirmed", False) and
+        st.session_state.get("pending_generation_data") is not None
+    )
+    
+    if submitted or should_continue_generation:
         try:
             # Initialize session state for update confirmation
             if "update_confirmed" not in st.session_state:
@@ -768,9 +774,35 @@ def show_create_video_page(selected_voice, uploaded_pdf):
             service_version = None
 
             # ==================================================
+            # RESTORE DATA IF CONTINUING AFTER "GENERATE NEW VERSION"
+            # ==================================================
+            if should_continue_generation:
+                # Restore stored data from previous submission
+                gen_data = st.session_state.pending_generation_data
+                uploaded_pdf = gen_data.get("uploaded_pdf")
+                if gen_data.get("pdf_bytes"):
+                    # Create a file-like object from stored bytes for PDF case
+                    import io
+                    pdf_bytes = gen_data["pdf_bytes"]
+                    pdf_path = gen_data.get("pdf_path")
+                    service_name = gen_data.get("service_name")
+                else:
+                    # Use stored form data
+                    service_name = gen_data.get("service_name")
+                    service_description = gen_data.get("service_description")
+                    how_to_apply = gen_data.get("how_to_apply")
+                    eligibility_criteria = gen_data.get("eligibility_criteria")
+                    required_docs = gen_data.get("required_docs")
+                    operator_tips = gen_data.get("operator_tips")
+                    troubleshooting = gen_data.get("troubleshooting")
+                    service_link = gen_data.get("service_link")
+                    fees_and_timeline = gen_data.get("fees_and_timeline")
+                    uploaded_pdf = None  # Clear uploaded_pdf so form path is used
+
+            # ==================================================
             # CASE 1: PDF EXISTS → IGNORE FORM + VERSION CHECK
             # ==================================================
-            if uploaded_pdf:
+            if uploaded_pdf or (should_continue_generation and pdf_bytes):
                 with status.container():
                     st.markdown('<div class="status-box">📄 Extracting content from PDF (form data ignored)...</div>', unsafe_allow_html=True)
 
@@ -789,7 +821,10 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                     # Check if this is the same update we're handling
                     update_key = f"{service_name}_{file_hash}"
                     if st.session_state.pending_update != update_key or not st.session_state.update_confirmed:
-                        # Show update warning
+                        # Show update warning with unique button keys
+                        progress.empty()
+                        status.empty()
+                        
                         st.warning(f"""
                         ⚠️ **Version Update Detected**
                         
@@ -800,18 +835,25 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                         
                         col_update, col_cancel = st.columns(2)
                         with col_update:
-                            if st.button("✅ Generate New Version", type="primary", use_container_width=True, key="pdf_update_btn"):
+                            if st.button("✅ Generate New Version", type="primary", use_container_width=True, key=f"pdf_update_btn_{file_hash[:8]}"):
+                                # Store data for continuation after rerun
+                                st.session_state.pending_generation_data = {
+                                    "pdf_bytes": pdf_bytes,
+                                    "service_name": service_name,
+                                    "pdf_path": None  # Will be regenerated
+                                }
                                 st.session_state.update_confirmed = True
                                 st.session_state.pending_update = update_key
                                 st.rerun()
                         with col_cancel:
-                            if st.button("❌ Cancel", use_container_width=True, key="pdf_cancel_btn"):
+                            if st.button("❌ Cancel", use_container_width=True, key=f"pdf_cancel_btn_{file_hash[:8]}"):
                                 st.session_state.update_confirmed = False
                                 st.session_state.pending_update = None
+                                st.session_state.pending_generation_data = None
                                 st.stop()
                         
                         st.info("ℹ️ Please click 'Generate New Version' to proceed or 'Cancel' to abort.")
-                        return
+                        st.stop()
                     
                     # User confirmed, proceed with update
                     from utils.version_utils import get_next_version
@@ -819,20 +861,25 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                     service_version = get_next_version(current_ver)
                     
                     st.success(f"🔄 Generating Version {service_version}...")
-                    # Reset confirmation for next time
-                    st.session_state.update_confirmed = False
-                    st.session_state.pending_update = None
+                    # Continue processing below - don't reset yet
                 
                 elif status_check == "UP_TO_DATE":
                     st.info(f"ℹ️ This document matches the existing version (v{existing_data.get('current_version', '1.0')}). Generating video with same content...")
                     service_version = existing_data.get('current_version', '1.0')
                     st.session_state.update_confirmed = False
                     st.session_state.pending_update = None
+                    st.session_state.pending_generation_data = None
                 
-                # Save PDF to temp file
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                    tmp.write(pdf_bytes)
-                    pdf_path = tmp.name
+                # Save PDF to temp file (if not already saved)
+                if not pdf_path:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                        tmp.write(pdf_bytes)
+                        pdf_path = tmp.name
+                elif should_continue_generation and pdf_bytes:
+                    # Re-save PDF if we're continuing with stored bytes
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                        tmp.write(pdf_bytes)
+                        pdf_path = tmp.name
 
                 pages = extract_raw_content(pdf_path)
                 raw_text = "\n".join(line for page in pages for line in page["lines"])
@@ -841,43 +888,68 @@ def show_create_video_page(selected_voice, uploaded_pdf):
             # CASE 2: FORM → RAW TEXT + VERSION CHECK
             # ==================================================
             else:
-                service_content = {
-                    "service_name": service_name,
-                    "service_description": service_description,
-                    "how_to_apply": how_to_apply,
-                    "eligibility_criteria": eligibility_criteria,
-                    "required_docs": required_docs,
-                    "operator_tips": operator_tips,
-                    "troubleshooting": troubleshooting,
-                    "service_link": service_link,
-                    "fees_and_timeline": fees_and_timeline,
-                }
+                # If continuing with stored data, use stored PDF path if available
+                if should_continue_generation and gen_data.get("pdf_path") and os.path.exists(gen_data["pdf_path"]):
+                    pdf_path = gen_data["pdf_path"]
+                    # Read PDF for hashing
+                    with open(pdf_path, "rb") as pdf_file:
+                        pdf_bytes = pdf_file.read()
+                    file_hash = get_file_hash(pdf_bytes)
+                    # Skip PDF generation and validation if continuing
+                    skip_pdf_generation = True
+                else:
+                    service_content = {
+                        "service_name": service_name,
+                        "service_description": service_description,
+                        "how_to_apply": how_to_apply,
+                        "eligibility_criteria": eligibility_criteria,
+                        "required_docs": required_docs,
+                        "operator_tips": operator_tips,
+                        "troubleshooting": troubleshooting,
+                        "service_link": service_link,
+                        "fees_and_timeline": fees_and_timeline,
+                    }
 
-                valid, msg = validate_service_content(service_content)
-                if not valid:
-                    st.error(f"❌ Validation Error: {msg}")
-                    return
+                    valid, msg = validate_service_content(service_content)
+                    if not valid:
+                        st.error(f"❌ Validation Error: {msg}")
+                        return
 
-                # 1️⃣ Generate & SAVE PDF
-                with status.container():
-                    st.markdown('<div class="status-box">📄 Generating training PDF from form data...</div>', unsafe_allow_html=True)
-                
-                progress.progress(10, text="Generating PDF document...")
-                pdf_path = generate_service_pdf(service_content)
+                    # 1️⃣ Generate & SAVE PDF
+                    with status.container():
+                        st.markdown('<div class="status-box">📄 Generating training PDF from form data...</div>', unsafe_allow_html=True)
+                    
+                    progress.progress(10, text="Generating PDF document...")
+                    pdf_path = generate_service_pdf(service_content)
+                    skip_pdf_generation = False
 
-                # Read PDF for hashing
-                with open(pdf_path, "rb") as pdf_file:
-                    pdf_bytes = pdf_file.read()
+                # Read PDF for hashing (if not already done)
+                if not skip_pdf_generation:
+                    with open(pdf_path, "rb") as pdf_file:
+                        pdf_bytes = pdf_file.read()
                     file_hash = get_file_hash(pdf_bytes)
                 
-                # Check for version updates
-                status_check, existing_data = check_for_updates(service_name, file_hash)
+                # Check for version updates (skip if continuing with confirmed update)
+                if should_continue_generation and st.session_state.update_confirmed:
+                    # Already confirmed, skip version check and proceed
+                    from utils.version_utils import get_next_version
+                    # Get existing data for version increment
+                    status_check, existing_data = check_for_updates(service_name, file_hash)
+                    if existing_data:
+                        current_ver = existing_data.get('current_version', '1.0')
+                        service_version = get_next_version(current_ver)
+                        st.success(f"🔄 Generating Version {service_version}...")
+                else:
+                    status_check, existing_data = check_for_updates(service_name, file_hash)
                 
-                if status_check == "UPDATE_NEEDED" and existing_data:
+                if not should_continue_generation and status_check == "UPDATE_NEEDED" and existing_data:
                     # Check if this is the same update we're handling
                     update_key = f"{service_name}_{file_hash}"
                     if st.session_state.pending_update != update_key or not st.session_state.update_confirmed:
-                        # Show update warning
+                        # Show update warning with unique button keys
+                        progress.empty()
+                        status.empty()
+                        
                         st.warning(f"""
                         ⚠️ **Version Update Detected**
                         
@@ -888,18 +960,32 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                         
                         col_update, col_cancel = st.columns(2)
                         with col_update:
-                            if st.button("✅ Generate New Version", type="primary", use_container_width=True, key="form_update_btn"):
+                            if st.button("✅ Generate New Version", type="primary", use_container_width=True, key=f"form_update_btn_{file_hash[:8]}"):
+                                # Store form data for continuation after rerun
+                                st.session_state.pending_generation_data = {
+                                    "service_name": service_name,
+                                    "service_description": service_description,
+                                    "how_to_apply": how_to_apply,
+                                    "eligibility_criteria": eligibility_criteria,
+                                    "required_docs": required_docs,
+                                    "operator_tips": operator_tips,
+                                    "troubleshooting": troubleshooting,
+                                    "service_link": service_link,
+                                    "fees_and_timeline": fees_and_timeline,
+                                    "pdf_path": pdf_path  # Already generated PDF
+                                }
                                 st.session_state.update_confirmed = True
                                 st.session_state.pending_update = update_key
                                 st.rerun()
                         with col_cancel:
-                            if st.button("❌ Cancel", use_container_width=True, key="form_cancel_btn"):
+                            if st.button("❌ Cancel", use_container_width=True, key=f"form_cancel_btn_{file_hash[:8]}"):
                                 st.session_state.update_confirmed = False
                                 st.session_state.pending_update = None
+                                st.session_state.pending_generation_data = None
                                 st.stop()
                         
                         st.info("ℹ️ Please click 'Generate New Version' to proceed or 'Cancel' to abort.")
-                        return
+                        st.stop()
                     
                     # User confirmed, proceed with update
                     from utils.version_utils import get_next_version
@@ -907,15 +993,14 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                     service_version = get_next_version(current_ver)
                     
                     st.success(f"🔄 Generating Version {service_version}...")
-                    # Reset confirmation for next time
-                    st.session_state.update_confirmed = False
-                    st.session_state.pending_update = None
+                    # Continue processing below - don't reset yet
                 
-                elif status_check == "UP_TO_DATE":
+                elif not should_continue_generation and status_check == "UP_TO_DATE":
                     st.info(f"ℹ️ This content matches the existing version (v{existing_data.get('current_version', '1.0')}). Generating video with same content...")
                     service_version = existing_data.get('current_version', '1.0')
                     st.session_state.update_confirmed = False
                     st.session_state.pending_update = None
+                    st.session_state.pending_generation_data = None
 
                 # Optional: show download button
                 with open(pdf_path, "rb") as f:
@@ -952,43 +1037,80 @@ def show_create_video_page(selected_voice, uploaded_pdf):
 
                 progress.progress(int(20 + (i / len(slides) * 60)), text=f"Processing slide {i + 1}/{len(slides)}...")
 
-                narration = " ".join(slide["bullets"])
-                audio = asyncio.run(text_to_speech(narration, voice=selected_voice))
-                audio_paths.append(audio)
-
                 try:
-                    image = fetch_and_save_photo(slide["image_keyword"])
-                except Exception as img_error:
-                    logging.warning(f"Image fetch failed: {img_error}. Using fallback.")
-                    # Fallback to default image if fetch fails
-                    fallback = os.path.join("images", "fallback_video.jpg")
-                    if not os.path.exists(fallback):
-                        # Create a simple fallback if it doesn't exist
-                        try:
-                            from PIL import Image
-                            os.makedirs("images", exist_ok=True)
-                            img = Image.new("RGB", (1280, 720), (30, 30, 40))
-                            img.save(fallback, "JPEG", quality=90)
-                        except Exception:
-                            pass
-                    image = fallback if os.path.exists(fallback) else os.path.join("assets", "default_background.jpg")
+                    narration = " ".join(slide["bullets"])
+                    
+                    # Generate audio
+                    with status.container():
+                        st.markdown(f'<div class="status-box">🎙️ Generating narration audio for slide {i + 1}...</div>', unsafe_allow_html=True)
+                    audio = asyncio.run(text_to_speech(narration, voice=selected_voice))
+                    audio_paths.append(audio)
 
-                clip = create_slide(slide["title"], slide["bullets"], image, audio)
-                clip = add_avatar_to_slide(clip, audio_duration=clip.duration)
-                video_clips.append(clip)
+                    # Fetch image
+                    with status.container():
+                        st.markdown(f'<div class="status-box">🖼️ Fetching image for slide {i + 1}...</div>', unsafe_allow_html=True)
+                    try:
+                        image = fetch_and_save_photo(slide["image_keyword"])
+                    except Exception as img_error:
+                        logging.warning(f"Image fetch failed: {img_error}. Using fallback.")
+                        # Fallback to default image if fetch fails
+                        fallback = os.path.join("images", "fallback_video.jpg")
+                        if not os.path.exists(fallback):
+                            # Create a simple fallback if it doesn't exist
+                            try:
+                                from PIL import Image
+                                os.makedirs("images", exist_ok=True)
+                                img = Image.new("RGB", (1280, 720), (30, 30, 40))
+                                img.save(fallback, "JPEG", quality=90)
+                            except Exception:
+                                pass
+                        image = fallback if os.path.exists(fallback) else os.path.join("assets", "default_background.jpg")
+
+                    # Create slide
+                    with status.container():
+                        st.markdown(f'<div class="status-box">🎥 Compositing slide {i + 1}...</div>', unsafe_allow_html=True)
+                    clip = create_slide(slide["title"], slide["bullets"], image, audio)
+                    
+                    # Add avatar
+                    with status.container():
+                        st.markdown(f'<div class="status-box">🧑‍🏫 Adding avatar to slide {i + 1}...</div>', unsafe_allow_html=True)
+                    clip = add_avatar_to_slide(clip, audio_duration=clip.duration)
+                    video_clips.append(clip)
+                    
+                    logging.info(f"Successfully created slide {i + 1}/{len(slides)}")
+                
+                except Exception as slide_error:
+                    logging.error(f"Error creating slide {i + 1}: {slide_error}")
+                    st.error(f"⚠️ Warning: Failed to create slide {i + 1}. Skipping...")
+                    continue
 
             with status.container():
                 st.markdown('<div class="status-box">🎞️ Rendering final video...</div>', unsafe_allow_html=True)
             
             progress.progress(90, text="Finalizing video...")
             
+            # Check if we have any video clips
+            if not video_clips:
+                logging.error("No video clips were created successfully")
+                st.error("❌ Failed to create video: No slides were generated successfully.")
+                st.error("Please check your content and try again.")
+                return
+            
             # Determine final service name and version
             final_service_name = service_name or "BSK_Service"
-            final_path = combine_slides_and_audio(
-                video_clips, audio_paths, 
-                service_name=final_service_name,
-                version=service_version
-            )
+            
+            try:
+                final_path = combine_slides_and_audio(
+                    video_clips, audio_paths, 
+                    service_name=final_service_name,
+                    version=service_version
+                )
+                logging.info(f"Video successfully rendered: {final_path}")
+            except Exception as render_error:
+                logging.error(f"Video rendering failed: {render_error}")
+                st.error(f"❌ Video rendering failed: {str(render_error)}")
+                st.error("Please try again or check the logs for more details.")
+                return
 
             # Register service version in registry
             if pdf_bytes:
@@ -998,13 +1120,18 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                 content_str = f"{service_name}{service_description}{how_to_apply}"
                 file_hash = get_file_hash(content_str.encode('utf-8'))
             
-            service_data = register_service_version(
-                service_name=final_service_name,
-                file_hash=file_hash,
-                video_path=final_path,
-                pdf_path=pdf_path,
-                source_type="uploaded" if uploaded_pdf else "generated"
-            )
+            try:
+                service_data = register_service_version(
+                    service_name=final_service_name,
+                    file_hash=file_hash,
+                    video_path=final_path,
+                    pdf_path=pdf_path,
+                    source_type="uploaded" if uploaded_pdf else "generated"
+                )
+                logging.info(f"Service version registered: {service_data}")
+            except Exception as reg_error:
+                logging.error(f"Failed to register service version: {reg_error}")
+                st.warning("⚠️ Video created but version registration failed. The video may not appear in version history.")
             
             # Update service_version if it wasn't set
             if not service_version:
@@ -1015,6 +1142,11 @@ def show_create_video_page(selected_voice, uploaded_pdf):
             st.session_state["audio_paths"] = audio_paths
             st.session_state["service_version"] = service_version
             st.session_state["service_data"] = service_data
+
+            # Clean up session state for update confirmation
+            st.session_state.update_confirmed = False
+            st.session_state.pending_update = None
+            st.session_state.pending_generation_data = None
 
             status.empty()
             progress.empty()
