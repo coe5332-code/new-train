@@ -798,6 +798,7 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                     service_link = gen_data.get("service_link")
                     fees_and_timeline = gen_data.get("fees_and_timeline")
                     uploaded_pdf = None  # Clear uploaded_pdf so form path is used
+                    # DON'T reset update_confirmed here - keep it True for version check
 
             # ==================================================
             # CASE 1: PDF EXISTS → IGNORE FORM + VERSION CHECK
@@ -930,15 +931,16 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                     file_hash = get_file_hash(pdf_bytes)
                 
                 # Check for version updates (skip if continuing with confirmed update)
-                if should_continue_generation and st.session_state.update_confirmed:
-                    # Already confirmed, skip version check and proceed
+                if should_continue_generation:
+                    # Already confirmed, get version and proceed directly to generation
                     from utils.version_utils import get_next_version
-                    # Get existing data for version increment
                     status_check, existing_data = check_for_updates(service_name, file_hash)
                     if existing_data:
                         current_ver = existing_data.get('current_version', '1.0')
                         service_version = get_next_version(current_ver)
                         st.success(f"🔄 Generating Version {service_version}...")
+                    else:
+                        service_version = "1.0"
                 else:
                     status_check, existing_data = check_for_updates(service_name, file_hash)
                 
@@ -1012,9 +1014,10 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                         use_container_width=True
                     )
 
-                # 2️⃣ Extract text from the saved PDF
-                pages = extract_raw_content(pdf_path)
-                raw_text = "\n".join(line for page in pages for line in page["lines"])
+                # 2️⃣ Extract text from the saved PDF (if not already extracted)
+                if 'raw_text' not in locals() or not raw_text:
+                    pages = extract_raw_content(pdf_path)
+                    raw_text = "\n".join(line for page in pages for line in page["lines"])
 
             # ==================================================
             # GEMINI → SLIDES (NEW API)

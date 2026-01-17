@@ -294,14 +294,31 @@ def combine_slides_and_audio(video_clips, audio_paths, service_name=None, versio
 
     output_path = os.path.join("output_videos", filename)
 
-    final_video.write_videofile(
-        output_path,
-        codec="libx264",
-        audio_codec="aac",
-        fps=30,
-        preset="medium",
-        bitrate="2000k",
-        threads=4
-    )
+    try:
+        final_video.write_videofile(
+            output_path,
+            codec="libx264",
+            audio_codec="aac",
+            fps=30,
+            preset="ultrafast",  # Changed from "medium" to "ultrafast" for faster rendering
+            bitrate="2000k",
+            threads=4,
+            logger=None,  # Suppress verbose output
+            verbose=False,
+            temp_audiofile="temp-audio.m4a",
+            remove_temp=True
+        )
+    finally:
+        # Clean up to free memory
+        try:
+            final_video.close()
+            for clip in video_clips:
+                if hasattr(clip, 'close'):
+                    clip.close()
+            for audio_clip in audio_clips:
+                if hasattr(audio_clip, 'close'):
+                    audio_clip.close()
+        except:
+            pass  # Ignore cleanup errors
 
     return output_path
