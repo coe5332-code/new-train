@@ -14,8 +14,7 @@ from utils.pdf_extractor import extract_raw_content
 from utils.pdf_utils import generate_service_pdf
 from utils.version_utils import (
     get_file_hash, check_for_updates, register_service_version,
-    get_service_info, get_version_history, normalize_service_name,
-    get_next_version
+    get_service_info, get_version_history, normalize_service_name
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -26,9 +25,19 @@ VOICES = {
 }
 
 
+# -------------------------------------------------
+# IMPROVED CSS STYLING
+# -------------------------------------------------
 def load_custom_css():
+    """Load custom CSS for better UI in both light and dark modes"""
     css = """
     <style>
+    /* ========================================
+       BSK Training Video Generator - Modern UI
+       Light & Dark Mode Support
+       ======================================== */
+
+    /* Light Mode Variables */
     :root {
         --bg-primary: #ffffff;
         --bg-secondary: #f8f9fa;
@@ -50,7 +59,10 @@ def load_custom_css():
         --shadow-lg: 0 8px 16px rgba(0,0,0,0.2);
     }
 
-    [data-theme="dark"], .stApp[data-theme="dark"], @media (prefers-color-scheme: dark) {
+    /* Dark Mode Variables */
+    [data-theme="dark"], 
+    .stApp[data-theme="dark"],
+    @media (prefers-color-scheme: dark) {
         :root {
             --bg-primary: #1e1e1e;
             --bg-secondary: #2d2d2d;
@@ -73,16 +85,174 @@ def load_custom_css():
         }
     }
 
-    .stApp { background-color: var(--bg-primary) !important; }
-    .main .block-container { background-color: var(--bg-primary) !important; }
-    .stMarkdown, .stMarkdown p, .stMarkdown div { color: var(--text-primary) !important; }
-    body, .main { background-color: var(--bg-primary) !important; color: var(--text-primary) !important; }
+    /* Global Styles */
+    .stApp {
+        background-color: var(--bg-primary) !important;
+    }
     
+    /* Ensure main content area has proper background */
+    .main .block-container {
+        background-color: var(--bg-primary) !important;
+    }
+    
+    /* Fix text visibility in all markdown elements */
+    .stMarkdown, .stMarkdown p, .stMarkdown div {
+        color: var(--text-primary) !important;
+    }
+    
+    /* Ensure all text is visible */
+    body, .main {
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+    }
+
+    /* Sidebar Styling */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%) !important;
         border-right: 1px solid var(--border-color);
     }
 
+    [data-testid="stSidebar"] .element-container {
+        color: var(--text-primary);
+    }
+
+    [data-testid="stSidebar"] h3 {
+        color: var(--text-primary) !important;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        font-size: 1.3rem;
+    }
+
+    [data-testid="stSidebar"] .stMarkdown p {
+        color: var(--text-secondary) !important;
+        line-height: 1.6;
+    }
+
+    [data-testid="stSidebar"] .stMarkdown strong {
+        color: var(--text-primary) !important;
+    }
+
+    [data-testid="stSidebar"] .stMarkdown em {
+        color: var(--accent-primary) !important;
+        font-style: normal;
+        font-weight: 500;
+    }
+
+    [data-testid="stSidebar"] hr {
+        border-color: var(--border-color);
+        margin: 1.5rem 0;
+        opacity: 0.5;
+    }
+
+    /* Main Content Area */
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+        max-width: 1400px;
+    }
+
+    /* Headers */
+    h1, h2, h3, h4, h5, h6 {
+        color: var(--text-primary) !important;
+        font-weight: 700;
+    }
+
+    .main h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .main h2 {
+        font-size: 1.5rem;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        color: var(--text-primary) !important;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    /* Text and Paragraphs */
+    p, div, span {
+        color: var(--text-primary) !important;
+    }
+
+    .stMarkdown {
+        color: var(--text-primary) !important;
+    }
+    
+    /* Ensure all Streamlit text elements are visible */
+    .element-container, .stText, .stMarkdown p, .stMarkdown div {
+        color: var(--text-primary) !important;
+    }
+    
+    /* Fix warning/info/error message text visibility */
+    .stAlert, [data-baseweb="notification"] {
+        color: var(--text-primary) !important;
+    }
+    
+    .stAlert p, .stAlert div, [data-baseweb="notification"] p, [data-baseweb="notification"] div {
+        color: inherit !important;
+    }
+
+    /* Input Fields */
+    .stTextInput input,
+    .stTextArea textarea {
+        background-color: var(--bg-secondary) !important;
+        color: var(--text-primary) !important;
+        border: 2px solid var(--border-color) !important;
+        border-radius: 8px !important;
+        padding: 0.75rem !important;
+        transition: all 0.3s ease;
+        font-size: 0.95rem !important;
+    }
+
+    .stTextInput input:focus,
+    .stTextArea textarea:focus {
+        border-color: var(--accent-primary) !important;
+        box-shadow: 0 0 0 3px rgba(77, 159, 255, 0.15) !important;
+        outline: none !important;
+    }
+
+    .stTextInput input::placeholder,
+    .stTextArea textarea::placeholder {
+        color: var(--text-muted) !important;
+        opacity: 0.7;
+    }
+
+    /* Labels */
+    .stTextInput label,
+    .stTextArea label,
+    .stSelectbox label,
+    .stFileUploader label {
+        color: var(--text-primary) !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem !important;
+    }
+
+    .stTextInput label p,
+    .stTextArea label p,
+    .stSelectbox label p,
+    .stFileUploader label p {
+        color: var(--text-primary) !important;
+        font-weight: 600 !important;
+    }
+
+    /* Form Container */
+    .stForm {
+        background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+        border: 2px solid var(--border-color);
+        border-radius: 16px;
+        padding: 2.5rem;
+        box-shadow: var(--shadow-md);
+        margin: 1.5rem 0;
+    }
+
+    /* Buttons */
     .stButton button {
         background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover)) !important;
         color: white !important;
@@ -93,11 +263,17 @@ def load_custom_css():
         font-size: 1rem !important;
         transition: all 0.3s ease !important;
         box-shadow: var(--shadow-sm) !important;
+        text-transform: none !important;
     }
 
     .stButton button:hover {
         transform: translateY(-2px);
         box-shadow: var(--shadow-md) !important;
+        background: linear-gradient(135deg, var(--accent-hover), var(--accent-primary)) !important;
+    }
+
+    .stButton button:active {
+        transform: translateY(0);
     }
 
     .stFormSubmitButton button {
@@ -107,11 +283,245 @@ def load_custom_css():
         font-size: 1.1rem !important;
     }
 
-    .stTextInput input, .stTextArea textarea {
-        background-color: var(--bg-secondary) !important;
+    .stFormSubmitButton button:hover {
+        background: linear-gradient(135deg, #20853a, #28a745) !important;
+    }
+
+    /* Download Button */
+    .stDownloadButton button {
+        background: linear-gradient(135deg, #6f42c1, #5a32a3) !important;
+        color: white !important;
+    }
+
+    .stDownloadButton button:hover {
+        background: linear-gradient(135deg, #5a32a3, #6f42c1) !important;
+    }
+
+    /* File Uploader */
+    .stFileUploader {
+        background-color: var(--bg-secondary);
+        border: 2px dashed var(--border-color);
+        border-radius: 12px;
+        padding: 2rem;
+        transition: all 0.3s ease;
+    }
+
+    .stFileUploader:hover {
+        border-color: var(--accent-primary);
+        background-color: var(--bg-tertiary);
+    }
+
+    .stFileUploader label {
         color: var(--text-primary) !important;
+        font-weight: 600 !important;
+    }
+
+    .stFileUploader section {
+        background-color: transparent !important;
+    }
+
+    .stFileUploader button {
+        background-color: var(--accent-primary) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+    }
+
+    /* Selectbox */
+    .stSelectbox > div > div {
+        background-color: var(--bg-secondary) !important;
         border: 2px solid var(--border-color) !important;
         border-radius: 8px !important;
+        color: var(--text-primary) !important;
+    }
+
+    .stSelectbox [data-baseweb="select"] {
+        background-color: var(--bg-secondary) !important;
+    }
+
+    .stSelectbox [data-baseweb="select"] > div {
+        background-color: var(--bg-secondary) !important;
+        border-color: var(--border-color) !important;
+        color: var(--text-primary) !important;
+    }
+
+    .stSelectbox [data-baseweb="select"] span {
+        color: var(--text-primary) !important;
+    }
+
+    /* Dropdown Menu */
+    [data-baseweb="popover"] {
+        background-color: var(--bg-secondary) !important;
+        border: 1px solid var(--border-color) !important;
+        box-shadow: var(--shadow-lg) !important;
+    }
+
+    [role="listbox"] {
+        background-color: var(--bg-secondary) !important;
+    }
+
+    [role="option"] {
+        background-color: var(--bg-secondary) !important;
+        color: var(--text-primary) !important;
+        padding: 0.75rem 1rem !important;
+    }
+
+    [role="option"]:hover {
+        background-color: var(--bg-tertiary) !important;
+    }
+
+    /* Progress Bar */
+    .stProgress > div > div {
+        background: linear-gradient(90deg, var(--accent-primary), var(--accent-hover)) !important;
+    }
+
+    .stProgress > div {
+        background-color: var(--bg-tertiary) !important;
+        border-radius: 10px;
+        overflow: hidden;
+        height: 12px !important;
+    }
+
+    /* Alert Messages */
+    [data-baseweb="notification"] {
+        background-color: var(--bg-secondary) !important;
+        border-radius: 10px !important;
+        box-shadow: var(--shadow-md) !important;
+        border-left: 4px solid !important;
+        padding: 1rem 1.5rem !important;
+    }
+
+    /* Success Alert */
+    [data-baseweb="notification"][kind="positive"],
+    .stSuccess {
+        background-color: var(--success-bg) !important;
+        border-left-color: #28a745 !important;
+    }
+
+    [data-baseweb="notification"][kind="positive"] div,
+    .stSuccess div {
+        color: var(--success-text) !important;
+    }
+
+    /* Error Alert */
+    [data-baseweb="notification"][kind="negative"],
+    .stError {
+        background-color: var(--error-bg) !important;
+        border-left-color: #dc3545 !important;
+    }
+
+    [data-baseweb="notification"][kind="negative"] div,
+    .stError div {
+        color: var(--error-text) !important;
+    }
+
+    /* Warning Alert */
+    [data-baseweb="notification"][kind="warning"],
+    .stWarning {
+        background-color: var(--warning-bg) !important;
+        border-left-color: #ffc107 !important;
+    }
+
+    [data-baseweb="notification"][kind="warning"] div,
+    [data-baseweb="notification"][kind="warning"] p,
+    .stWarning div, .stWarning p {
+        color: var(--warning-text) !important;
+        font-weight: 600 !important;
+    }
+
+    /* Info Alert */
+    [data-baseweb="notification"][kind="info"],
+    .stInfo {
+        background-color: var(--bg-tertiary) !important;
+        border-left-color: var(--accent-primary) !important;
+    }
+
+    [data-baseweb="notification"][kind="info"] div,
+    [data-baseweb="notification"][kind="info"] p,
+    .stInfo div, .stInfo p {
+        color: var(--text-primary) !important;
+        font-weight: 500 !important;
+    }
+
+    /* Video Player */
+    .stVideo {
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+        margin: 1.5rem 0;
+        border: 2px solid var(--border-color);
+    }
+
+    /* Columns */
+    .row-widget {
+        gap: 1.5rem;
+    }
+
+    [data-testid="column"] {
+        background-color: transparent;
+        padding: 0.5rem;
+    }
+
+    /* Divider */
+    hr {
+        border-color: var(--border-color) !important;
+        margin: 2rem 0 !important;
+        opacity: 0.5;
+    }
+
+    /* Caption Text */
+    .stCaption {
+        color: var(--text-muted) !important;
+        font-size: 0.875rem !important;
+    }
+
+    .stCaption p {
+        color: var(--text-muted) !important;
+    }
+
+    /* Balloons Animation */
+    .balloons {
+        z-index: 9999;
+    }
+
+    /* Empty State */
+    .stInfo p {
+        color: var(--text-primary) !important;
+        font-size: 1rem;
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--bg-secondary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-muted);
+    }
+
+    /* Custom Classes */
+    .section-header {
+        background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+        padding: 1rem 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid var(--accent-primary);
+        margin: 1.5rem 0 1rem 0;
+    }
+
+    .section-header h2 {
+        margin: 0 !important;
+        border: none !important;
+        padding: 0 !important;
     }
 
     .status-box {
@@ -120,13 +530,82 @@ def load_custom_css():
         border-radius: 8px !important;
         padding: 1rem 1.5rem !important;
         margin: 1rem 0 !important;
+        font-weight: 500 !important;
         color: var(--text-primary) !important;
+    }
+    
+    .status-box p, .status-box div, .status-box span {
+        color: var(--text-primary) !important;
+    }
+    
+    /* Ensure all warning/info/error messages have visible text */
+    .stWarning, .stInfo, .stError, .stSuccess {
+        color: var(--text-primary) !important;
+    }
+    
+    .stWarning p, .stInfo p, .stError p, .stSuccess p,
+    .stWarning div, .stInfo div, .stError div, .stSuccess div {
+        color: inherit !important;
+    }
+    
+    /* Fix Streamlit's default text colors */
+    [class*="st"] {
+        color: var(--text-primary) !important;
+    }
+    
+    /* Ensure form labels are visible */
+    label, .stTextInput label, .stTextArea label {
+        color: var(--text-primary) !important;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .main h1 {
+            font-size: 2rem;
+        }
+        
+        .main h2 {
+            font-size: 1.3rem;
+        }
+        
+        .stForm {
+            padding: 1.5rem;
+        }
+
+        .row-widget {
+            flex-direction: column;
+        }
+    }
+
+    /* Animation */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .main .block-container {
+        animation: fadeIn 0.4s ease-out;
+    }
+
+    /* Required Field Asterisk */
+    .stTextInput label::after,
+    .stTextArea label::after {
+        content: '';
     }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
 
+# -------------------------------------------------
+# MAIN
+# -------------------------------------------------
 def main():
     st.set_page_config(
         page_title="BSK Training Video Generator",
@@ -135,13 +614,16 @@ def main():
         initial_sidebar_state="expanded",
     )
 
+    # Load improved CSS
     load_custom_css()
 
+    # Also try to load external CSS if exists
     css_path = os.path.join("assets", "style.css")
     if os.path.exists(css_path):
         with open(css_path) as f:
             st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
+    # ---------------- SIDEBAR ----------------
     with st.sidebar:
         st.markdown("### 🎥 BSK Training Generator")
         st.markdown("**Professional Training Videos**")
@@ -179,472 +661,592 @@ def main():
         st.markdown("### 🧑‍🏫 AI Avatar")
         st.caption("Avatar will appear in the generated video")
 
+    # ---------------- ROUTING ----------------
     if page == "🎬 Create New Video":
         show_create_video_page(selected_voice, uploaded_pdf)
     else:
         show_existing_videos_page()
 
 
+# -------------------------------------------------
+# CREATE VIDEO PAGE
+# -------------------------------------------------
 def show_create_video_page(selected_voice, uploaded_pdf):
     st.title("🎥 BSK Training Video Generator")
     st.markdown("**Create professional training videos for BSK data entry operators**")
     st.markdown("---")
 
-    if "update_confirmed" not in st.session_state:
-        st.session_state.update_confirmed = False
-    if "pending_generation_data" not in st.session_state:
-        st.session_state.pending_generation_data = None
+    # ---------------- FORM UI ----------------
+    with st.form("service_form"):
+        st.markdown('<div class="section-header"><h2>📋 Service Training Information</h2></div>', unsafe_allow_html=True)
 
-    should_generate = st.session_state.get("update_confirmed", False)
+        col1, col2 = st.columns(2)
 
-    if not should_generate:
-        with st.form("service_form"):
-            st.markdown('<div class="section-header"><h2>📋 Service Training Information</h2></div>', unsafe_allow_html=True)
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                service_name = st.text_input(
-                    "Service Name *",
-                    placeholder="e.g., Aadhaar Card Application",
-                    help="Enter the name of the government service"
-                )
-                service_description = st.text_area(
-                    "Service Description *",
-                    height=100,
-                    placeholder="Provide a brief overview of the service...",
-                    help="Describe what this service does"
-                )
-
-            with col2:
-                how_to_apply = st.text_area(
-                    "Step-by-Step Application Process *",
-                    height=100,
-                    placeholder="1. Visit the portal\n2. Fill the form\n3. Upload documents...",
-                    help="Detailed steps for applying"
-                )
-                eligibility_criteria = st.text_area(
-                    "Eligibility Criteria *",
-                    height=100,
-                    placeholder="Who can apply for this service...",
-                    help="Requirements to be eligible"
-                )
-
-            required_docs = st.text_area(
-                "Required Documents *",
-                height=80,
-                placeholder="• Aadhaar Card\n• Address Proof\n• Photo...",
-                help="List all necessary documents"
+        with col1:
+            service_name = st.text_input(
+                "Service Name *",
+                placeholder="e.g., Aadhaar Card Application",
+                help="Enter the name of the government service"
+            )
+            service_description = st.text_area(
+                "Service Description *",
+                height=100,
+                placeholder="Provide a brief overview of the service...",
+                help="Describe what this service does"
             )
 
-            st.markdown('<div class="section-header"><h2>🎯 Training Specific Information</h2></div>', unsafe_allow_html=True)
-            
-            col3, col4 = st.columns(2)
-
-            with col3:
-                operator_tips = st.text_area(
-                    "Operator Tips (Optional)",
-                    height=100,
-                    placeholder="Important tips for data entry operators...",
-                    help="Special instructions for operators"
-                )
-                service_link = st.text_input(
-                    "Official Service Link (Optional)",
-                    placeholder="https://example.gov.in/service",
-                    help="Direct link to the service portal"
-                )
-
-            with col4:
-                troubleshooting = st.text_area(
-                    "Common Issues & Solutions (Optional)",
-                    height=100,
-                    placeholder="Issue: Form not loading\nSolution: Clear browser cache...",
-                    help="Common problems and their fixes"
-                )
-                fees_and_timeline = st.text_input(
-                    "Fees & Processing Time (Optional)",
-                    placeholder="Fee: ₹50 | Processing: 7-10 days",
-                    help="Cost and expected timeline"
-                )
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            submitted = st.form_submit_button("🚀 Generate Training Video", use_container_width=True)
-
-        if submitted:
-            handle_form_submission(
-                uploaded_pdf, service_name, service_description, how_to_apply,
-                eligibility_criteria, required_docs, operator_tips, service_link,
-                troubleshooting, fees_and_timeline, selected_voice
+        with col2:
+            how_to_apply = st.text_area(
+                "Step-by-Step Application Process *",
+                height=100,
+                placeholder="1. Visit the portal\n2. Fill the form\n3. Upload documents...",
+                help="Detailed steps for applying"
             )
-    else:
-        generate_video_from_pending_data(selected_voice)
+            eligibility_criteria = st.text_area(
+                "Eligibility Criteria *",
+                height=100,
+                placeholder="Who can apply for this service...",
+                help="Requirements to be eligible"
+            )
 
-    if "video_path" in st.session_state:
-        display_generated_video()
+        required_docs = st.text_area(
+            "Required Documents *",
+            height=80,
+            placeholder="• Aadhaar Card\n• Address Proof\n• Photo...",
+            help="List all necessary documents"
+        )
 
-
-def handle_form_submission(uploaded_pdf, service_name, service_description, how_to_apply,
-                           eligibility_criteria, required_docs, operator_tips, service_link,
-                           troubleshooting, fees_and_timeline, selected_voice):
-    
-    try:
-        pdf_bytes = None
-        file_hash = None
+        st.markdown('<div class="section-header"><h2>🎯 Training Specific Information</h2></div>', unsafe_allow_html=True)
         
-        if uploaded_pdf:
-            uploaded_pdf.seek(0)
-            pdf_bytes = uploaded_pdf.read()
-            service_name = uploaded_pdf.name.replace(".pdf", "").replace(".PDF", "")
-            file_hash = get_file_hash(pdf_bytes)
-        else:
-            service_content = {
-                "service_name": service_name,
-                "service_description": service_description,
-                "how_to_apply": how_to_apply,
-                "eligibility_criteria": eligibility_criteria,
-                "required_docs": required_docs,
-                "operator_tips": operator_tips,
-                "troubleshooting": troubleshooting,
-                "service_link": service_link,
-                "fees_and_timeline": fees_and_timeline,
-            }
+        col3, col4 = st.columns(2)
 
-            valid, msg = validate_service_content(service_content)
-            if not valid:
-                st.error(f"❌ Validation Error: {msg}")
+        with col3:
+            operator_tips = st.text_area(
+                "Operator Tips (Optional)",
+                height=100,
+                placeholder="Important tips for data entry operators...",
+                help="Special instructions for operators"
+            )
+            service_link = st.text_input(
+                "Official Service Link (Optional)",
+                placeholder="https://example.gov.in/service",
+                help="Direct link to the service portal"
+            )
+
+        with col4:
+            troubleshooting = st.text_area(
+                "Common Issues & Solutions (Optional)",
+                height=100,
+                placeholder="Issue: Form not loading\nSolution: Clear browser cache...",
+                help="Common problems and their fixes"
+            )
+            fees_and_timeline = st.text_input(
+                "Fees & Processing Time (Optional)",
+                placeholder="Fee: ₹50 | Processing: 7-10 days",
+                help="Cost and expected timeline"
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        submitted = st.form_submit_button("🚀 Generate Training Video", use_container_width=True)
+
+    # ---------------- GENERATION LOGIC ----------------
+    # Check if we're continuing after "Generate New Version" was clicked
+    should_continue_generation = (
+        st.session_state.get("update_confirmed", False) and
+        st.session_state.get("pending_generation_data") is not None
+    )
+    
+    if submitted or should_continue_generation:
+        try:
+            # Initialize session state for update confirmation
+            if "update_confirmed" not in st.session_state:
+                st.session_state.update_confirmed = False
+            if "pending_update" not in st.session_state:
+                st.session_state.pending_update = None
+            
+            progress = st.progress(0, text="Initializing video generation...")
+            status = st.empty()
+
+            video_clips = []
+            audio_paths = []
+            pdf_bytes = None
+            pdf_path = None
+            service_version = None
+
+            # ==================================================
+            # RESTORE DATA IF CONTINUING AFTER "GENERATE NEW VERSION"
+            # ==================================================
+            gen_data = None
+            is_pdf_continuation = False
+            if should_continue_generation:
+                # Restore stored data from previous submission
+                gen_data = st.session_state.pending_generation_data
+                if gen_data:
+                    uploaded_pdf = gen_data.get("uploaded_pdf")
+                    if gen_data.get("pdf_bytes"):
+                        # PDF upload case - restore PDF bytes
+                        pdf_bytes = gen_data["pdf_bytes"]
+                        pdf_path = gen_data.get("pdf_path")
+                        service_name = gen_data.get("service_name", "Service")
+                        is_pdf_continuation = True
+                    else:
+                        # Form input case - restore form fields
+                        service_name = gen_data.get("service_name", "")
+                        service_description = gen_data.get("service_description", "")
+                        how_to_apply = gen_data.get("how_to_apply", "")
+                        eligibility_criteria = gen_data.get("eligibility_criteria", "")
+                        required_docs = gen_data.get("required_docs", "")
+                        operator_tips = gen_data.get("operator_tips", "")
+                        troubleshooting = gen_data.get("troubleshooting", "")
+                        service_link = gen_data.get("service_link", "")
+                        fees_and_timeline = gen_data.get("fees_and_timeline", "")
+                        uploaded_pdf = None
+                        is_pdf_continuation = False
+
+            # ==================================================
+            # CASE 1: PDF EXISTS → IGNORE FORM + VERSION CHECK
+            # ==================================================
+            if uploaded_pdf or (should_continue_generation and is_pdf_continuation):
+                with status.container():
+                    st.markdown('<div class="status-box">📄 Extracting content from PDF (form data ignored)...</div>', unsafe_allow_html=True)
+
+                # Handle PDF bytes - either from upload or from stored data
+                if should_continue_generation and gen_data.get("pdf_bytes"):
+                    # Continuing from stored PDF bytes
+                    pdf_bytes = gen_data["pdf_bytes"]
+                    service_name = gen_data.get("service_name", "Service")
+                else:
+                    # New PDF upload
+                    uploaded_pdf.seek(0)
+                    pdf_bytes = uploaded_pdf.read()
+                    service_name = uploaded_pdf.name.replace(".pdf", "").replace(".PDF", "")
+                
+                file_hash = get_file_hash(pdf_bytes)
+                
+                # Check for version updates
+                status_check, existing_data = check_for_updates(service_name, file_hash)
+                
+                if status_check == "UPDATE_NEEDED" and existing_data:
+                    # Check if this is the same update we're handling
+                    update_key = f"{service_name}_{file_hash}"
+                    if st.session_state.pending_update != update_key or not st.session_state.update_confirmed:
+                        # Show update warning with unique button keys
+                        progress.empty()
+                        status.empty()
+                        
+                        st.warning(f"""
+                        ⚠️ **Version Update Detected**
+                        
+                        A training video for **{service_name}** already exists (Version {existing_data.get('current_version', '1.0')}).
+                        
+                        The uploaded document has changes. Would you like to generate a new version?
+                        """)
+                        
+                        col_update, col_cancel = st.columns(2)
+                        with col_update:
+                            if st.button("✅ Generate New Version", type="primary", use_container_width=True, key=f"pdf_update_btn_{file_hash[:8]}"):
+                                # Store data for continuation after rerun
+                                st.session_state.pending_generation_data = {
+                                    "pdf_bytes": pdf_bytes,
+                                    "service_name": service_name,
+                                    "pdf_path": None  # Will be regenerated
+                                }
+                                st.session_state.update_confirmed = True
+                                st.session_state.pending_update = update_key
+                                st.rerun()
+                        with col_cancel:
+                            if st.button("❌ Cancel", use_container_width=True, key=f"pdf_cancel_btn_{file_hash[:8]}"):
+                                st.session_state.update_confirmed = False
+                                st.session_state.pending_update = None
+                                st.session_state.pending_generation_data = None
+                                st.stop()
+                        
+                        st.info("ℹ️ Please click 'Generate New Version' to proceed or 'Cancel' to abort.")
+                        st.stop()
+                    
+                    # User confirmed, proceed with update
+                    from utils.version_utils import get_next_version
+                    current_ver = existing_data.get('current_version', '1.0')
+                    service_version = get_next_version(current_ver)
+                    
+                    st.success(f"🔄 Generating Version {service_version}...")
+                    # Continue processing below - don't reset yet
+                
+                elif status_check == "UP_TO_DATE":
+                    st.info(f"ℹ️ This document matches the existing version (v{existing_data.get('current_version', '1.0')}). Generating video with same content...")
+                    service_version = existing_data.get('current_version', '1.0')
+                    st.session_state.update_confirmed = False
+                    st.session_state.pending_update = None
+                    st.session_state.pending_generation_data = None
+                
+                # Save PDF to temp file (if not already saved)
+                if should_continue_generation:
+                    if gen_data and gen_data.get("pdf_path") and os.path.exists(gen_data["pdf_path"]):
+                        # Use existing PDF path if available
+                        pdf_path = gen_data["pdf_path"]
+                    else:
+                        # Re-save PDF from stored bytes
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                            tmp.write(pdf_bytes)
+                            pdf_path = tmp.name
+                else:
+                    # Save new PDF upload to temp file
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                        tmp.write(pdf_bytes)
+                        pdf_path = tmp.name
+
+                pages = extract_raw_content(pdf_path)
+                raw_text = "\n".join(line for page in pages for line in page["lines"])
+
+            # ==================================================
+            # CASE 2: FORM → RAW TEXT + VERSION CHECK
+            # ==================================================
+            else:
+                # If continuing with stored form data, use stored PDF path if available
+                skip_pdf_generation = False
+                if should_continue_generation:
+                    if gen_data and gen_data.get("pdf_path") and os.path.exists(gen_data["pdf_path"]):
+                        # Use existing PDF from previous generation
+                        pdf_path = gen_data["pdf_path"]
+                        with open(pdf_path, "rb") as pdf_file:
+                            pdf_bytes = pdf_file.read()
+                        file_hash = get_file_hash(pdf_bytes)
+                        skip_pdf_generation = True
+                    else:
+                        # PDF was deleted, regenerate from form data (already restored above)
+                        skip_pdf_generation = False
+                
+                if not skip_pdf_generation:
+                    service_content = {
+                        "service_name": service_name,
+                        "service_description": service_description,
+                        "how_to_apply": how_to_apply,
+                        "eligibility_criteria": eligibility_criteria,
+                        "required_docs": required_docs,
+                        "operator_tips": operator_tips,
+                        "troubleshooting": troubleshooting,
+                        "service_link": service_link,
+                        "fees_and_timeline": fees_and_timeline,
+                    }
+
+                    valid, msg = validate_service_content(service_content)
+                    if not valid:
+                        st.error(f"❌ Validation Error: {msg}")
+                        return
+
+                    # 1️⃣ Generate & SAVE PDF
+                    with status.container():
+                        st.markdown('<div class="status-box">📄 Generating training PDF from form data...</div>', unsafe_allow_html=True)
+                    
+                    progress.progress(10, text="Generating PDF document...")
+                    pdf_path = generate_service_pdf(service_content)
+                    skip_pdf_generation = False
+
+                # Read PDF for hashing (if not already done)
+                if not skip_pdf_generation:
+                    with open(pdf_path, "rb") as pdf_file:
+                        pdf_bytes = pdf_file.read()
+                    file_hash = get_file_hash(pdf_bytes)
+                
+                # Check for version updates (skip if continuing with confirmed update)
+                if should_continue_generation:
+                    # Already confirmed, get version and proceed directly to generation
+                    from utils.version_utils import get_next_version
+                    status_check, existing_data = check_for_updates(service_name, file_hash)
+                    if existing_data:
+                        current_ver = existing_data.get('current_version', '1.0')
+                        service_version = get_next_version(current_ver)
+                        st.success(f"🔄 Generating Version {service_version}...")
+                    else:
+                        service_version = "1.0"
+                    # Skip version check dialog since user already confirmed
+                else:
+                    status_check, existing_data = check_for_updates(service_name, file_hash)
+                
+                if not should_continue_generation and status_check == "UPDATE_NEEDED" and existing_data:
+                    # Check if this is the same update we're handling
+                    update_key = f"{service_name}_{file_hash}"
+                    if st.session_state.pending_update != update_key or not st.session_state.update_confirmed:
+                        # Show update warning with unique button keys
+                        progress.empty()
+                        status.empty()
+                        
+                        st.warning(f"""
+                        ⚠️ **Version Update Detected**
+                        
+                        A training video for **{service_name}** already exists (Version {existing_data.get('current_version', '1.0')}).
+                        
+                        The form content has changes. Would you like to generate a new version?
+                        """)
+                        
+                        col_update, col_cancel = st.columns(2)
+                        with col_update:
+                            if st.button("✅ Generate New Version", type="primary", use_container_width=True, key=f"form_update_btn_{file_hash[:8]}"):
+                                # Store form data for continuation after rerun
+                                st.session_state.pending_generation_data = {
+                                    "service_name": service_name,
+                                    "service_description": service_description,
+                                    "how_to_apply": how_to_apply,
+                                    "eligibility_criteria": eligibility_criteria,
+                                    "required_docs": required_docs,
+                                    "operator_tips": operator_tips,
+                                    "troubleshooting": troubleshooting,
+                                    "service_link": service_link,
+                                    "fees_and_timeline": fees_and_timeline,
+                                    "pdf_path": pdf_path  # Already generated PDF
+                                }
+                                st.session_state.update_confirmed = True
+                                st.session_state.pending_update = update_key
+                                st.rerun()
+                        with col_cancel:
+                            if st.button("❌ Cancel", use_container_width=True, key=f"form_cancel_btn_{file_hash[:8]}"):
+                                st.session_state.update_confirmed = False
+                                st.session_state.pending_update = None
+                                st.session_state.pending_generation_data = None
+                                st.stop()
+                        
+                        st.info("ℹ️ Please click 'Generate New Version' to proceed or 'Cancel' to abort.")
+                        st.stop()
+                    
+                    # User confirmed, proceed with update
+                    from utils.version_utils import get_next_version
+                    current_ver = existing_data.get('current_version', '1.0')
+                    service_version = get_next_version(current_ver)
+                    
+                    st.success(f"🔄 Generating Version {service_version}...")
+                    # Continue processing below - don't reset yet
+                
+                elif not should_continue_generation and status_check == "UP_TO_DATE":
+                    st.info(f"ℹ️ This content matches the existing version (v{existing_data.get('current_version', '1.0')}). Generating video with same content...")
+                    service_version = existing_data.get('current_version', '1.0')
+                    st.session_state.update_confirmed = False
+                    st.session_state.pending_update = None
+                    st.session_state.pending_generation_data = None
+
+                # Optional: show download button (only if not continuing or PDF exists)
+                if pdf_path and os.path.exists(pdf_path) and not should_continue_generation:
+                    with open(pdf_path, "rb") as f:
+                        st.download_button(
+                            "📥 Download Training PDF",
+                            data=f.read(),
+                            file_name=os.path.basename(pdf_path),
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+
+                # 2️⃣ Extract text from the saved PDF (if not already extracted)
+                if 'raw_text' not in locals() or not raw_text:
+                    pages = extract_raw_content(pdf_path)
+                    raw_text = "\n".join(line for page in pages for line in page["lines"])
+
+            # ==================================================
+            # GEMINI → SLIDES (NEW API)
+            # ==================================================
+            with status.container():
+                st.markdown('<div class="status-box">🧠 Structuring training slides using AI...</div>', unsafe_allow_html=True)
+            
+            progress.progress(20, text="Processing content with AI...")
+            slides_response = generate_slides_from_raw(raw_text)
+            slides = slides_response["slides"]
+
+            st.info(f"✅ Generated {len(slides)} training slides")
+
+            # ==================================================
+            # VIDEO PIPELINE
+            # ==================================================
+            for i, slide in enumerate(slides):
+                with status.container():
+                    st.markdown(f'<div class="status-box">🎬 Creating slide {i + 1} of {len(slides)}: {slide["title"]}</div>', unsafe_allow_html=True)
+
+                progress.progress(int(20 + (i / len(slides) * 60)), text=f"Processing slide {i + 1}/{len(slides)}...")
+
+                try:
+                    narration = " ".join(slide["bullets"])
+                    
+                    # Generate audio
+                    with status.container():
+                        st.markdown(f'<div class="status-box">🎙️ Generating narration audio for slide {i + 1}...</div>', unsafe_allow_html=True)
+                    audio = asyncio.run(text_to_speech(narration, voice=selected_voice))
+                    audio_paths.append(audio)
+
+                    # Fetch image
+                    with status.container():
+                        st.markdown(f'<div class="status-box">🖼️ Fetching image for slide {i + 1}...</div>', unsafe_allow_html=True)
+                    try:
+                        image = fetch_and_save_photo(slide["image_keyword"])
+                    except Exception as img_error:
+                        logging.warning(f"Image fetch failed: {img_error}. Using fallback.")
+                        # Fallback to default image if fetch fails
+                        fallback = os.path.join("images", "fallback_video.jpg")
+                        if not os.path.exists(fallback):
+                            # Create a simple fallback if it doesn't exist
+                            try:
+                                from PIL import Image
+                                os.makedirs("images", exist_ok=True)
+                                img = Image.new("RGB", (1280, 720), (30, 30, 40))
+                                img.save(fallback, "JPEG", quality=90)
+                            except Exception:
+                                pass
+                        image = fallback if os.path.exists(fallback) else os.path.join("assets", "default_background.jpg")
+
+                    # Create slide
+                    with status.container():
+                        st.markdown(f'<div class="status-box">🎥 Compositing slide {i + 1}...</div>', unsafe_allow_html=True)
+                    clip = create_slide(slide["title"], slide["bullets"], image, audio)
+                    
+                    # Add avatar
+                    with status.container():
+                        st.markdown(f'<div class="status-box">🧑‍🏫 Adding avatar to slide {i + 1}...</div>', unsafe_allow_html=True)
+                    clip = add_avatar_to_slide(clip, audio_duration=clip.duration)
+                    video_clips.append(clip)
+                    
+                    logging.info(f"Successfully created slide {i + 1}/{len(slides)}")
+                
+                except Exception as slide_error:
+                    logging.error(f"Error creating slide {i + 1}: {slide_error}")
+                    st.error(f"⚠️ Warning: Failed to create slide {i + 1}. Skipping...")
+                    continue
+
+            with status.container():
+                st.markdown('<div class="status-box">🎞️ Rendering final video...</div>', unsafe_allow_html=True)
+            
+            progress.progress(90, text="Finalizing video...")
+            
+            # Check if we have any video clips
+            if not video_clips:
+                logging.error("No video clips were created successfully")
+                st.error("❌ Failed to create video: No slides were generated successfully.")
+                st.error("Please check your content and try again.")
+                return
+            
+            # Determine final service name and version
+            final_service_name = service_name or "BSK_Service"
+            
+            try:
+                final_path = combine_slides_and_audio(
+                    video_clips, audio_paths, 
+                    service_name=final_service_name,
+                    version=service_version
+                )
+                logging.info(f"Video successfully rendered: {final_path}")
+            except Exception as render_error:
+                logging.error(f"Video rendering failed: {render_error}")
+                st.error(f"❌ Video rendering failed: {str(render_error)}")
+                st.error("Please try again or check the logs for more details.")
                 return
 
-            pdf_path = generate_service_pdf(service_content)
-            with open(pdf_path, "rb") as pdf_file:
-                pdf_bytes = pdf_file.read()
-            file_hash = get_file_hash(pdf_bytes)
-        
-        status_check, existing_data = check_for_updates(service_name, file_hash)
-        
-        if status_check == "UPDATE_NEEDED" and existing_data:
-            st.warning(f"""
-            ⚠️ **Version Update Detected**
-            
-            A training video for **{service_name}** already exists (Version {existing_data.get('current_version', '1.0')}).
-            
-            The content has changes. Would you like to generate a new version?
-            """)
-            
-            col_update, col_cancel = st.columns(2)
-            with col_update:
-                if st.button("✅ Generate New Version", type="primary", use_container_width=True, key=f"update_btn_{file_hash[:8]}"):
-                    st.session_state.pending_generation_data = {
-                        "pdf_bytes": pdf_bytes if uploaded_pdf else None,
-                        "service_name": service_name,
-                        "service_description": service_description if not uploaded_pdf else None,
-                        "how_to_apply": how_to_apply if not uploaded_pdf else None,
-                        "eligibility_criteria": eligibility_criteria if not uploaded_pdf else None,
-                        "required_docs": required_docs if not uploaded_pdf else None,
-                        "operator_tips": operator_tips if not uploaded_pdf else None,
-                        "troubleshooting": troubleshooting if not uploaded_pdf else None,
-                        "service_link": service_link if not uploaded_pdf else None,
-                        "fees_and_timeline": fees_and_timeline if not uploaded_pdf else None,
-                        "is_pdf": uploaded_pdf is not None
-                    }
-                    st.session_state.update_confirmed = True
-                    st.rerun()
-            with col_cancel:
-                if st.button("❌ Cancel", use_container_width=True, key=f"cancel_btn_{file_hash[:8]}"):
-                    st.session_state.update_confirmed = False
-                    st.session_state.pending_generation_data = None
-                    st.stop()
-            
-            st.info("ℹ️ Please click 'Generate New Version' to proceed or 'Cancel' to abort.")
-            st.stop()
-        else:
-            st.session_state.pending_generation_data = {
-                "pdf_bytes": pdf_bytes if uploaded_pdf else None,
-                "service_name": service_name,
-                "service_description": service_description if not uploaded_pdf else None,
-                "how_to_apply": how_to_apply if not uploaded_pdf else None,
-                "eligibility_criteria": eligibility_criteria if not uploaded_pdf else None,
-                "required_docs": required_docs if not uploaded_pdf else None,
-                "operator_tips": operator_tips if not uploaded_pdf else None,
-                "troubleshooting": troubleshooting if not uploaded_pdf else None,
-                "service_link": service_link if not uploaded_pdf else None,
-                "fees_and_timeline": fees_and_timeline if not uploaded_pdf else None,
-                "is_pdf": uploaded_pdf is not None
-            }
-            st.session_state.update_confirmed = True
-            st.rerun()
-            
-    except Exception as e:
-        logging.error(f"Form submission error: {e}")
-        st.error(f"❌ Error: {str(e)}")
-
-
-def generate_video_from_pending_data(selected_voice):
-    gen_data = st.session_state.pending_generation_data
-    
-    if not gen_data:
-        st.error("No pending generation data found")
-        st.session_state.update_confirmed = False
-        return
-    
-    try:
-        progress = st.progress(0, text="Initializing video generation...")
-        status = st.empty()
-
-        video_clips = []
-        audio_paths = []
-        service_version = None
-
-        is_pdf = gen_data.get("is_pdf", False)
-        service_name = gen_data.get("service_name", "Service")
-
-        if is_pdf:
-            with status.container():
-                st.markdown('<div class="status-box">📄 Extracting content from PDF...</div>', unsafe_allow_html=True)
-            
-            pdf_bytes = gen_data["pdf_bytes"]
-            file_hash = get_file_hash(pdf_bytes)
-            
-            status_check, existing_data = check_for_updates(service_name, file_hash)
-            
-            if status_check == "UPDATE_NEEDED" and existing_data:
-                current_ver = existing_data.get('current_version', '1.0')
-                service_version = get_next_version(current_ver)
-                st.success(f"🔄 Generating Version {service_version}...")
-            elif status_check == "UP_TO_DATE" and existing_data:
-                service_version = existing_data.get('current_version', '1.0')
-                st.info(f"ℹ️ Generating video for existing version v{service_version}...")
+            # Register service version in registry
+            if pdf_bytes:
+                file_hash = get_file_hash(pdf_bytes)
             else:
-                service_version = "1.0"
-                st.info("🆕 Generating initial version...")
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                tmp.write(pdf_bytes)
-                pdf_path = tmp.name
-
-            pages = extract_raw_content(pdf_path)
-            raw_text = "\n".join(line for page in pages for line in page["lines"])
-
-        else:
-            with status.container():
-                st.markdown('<div class="status-box">📄 Generating training PDF from form data...</div>', unsafe_allow_html=True)
+                # For form-based generation, create hash from content
+                content_str = f"{service_name}{service_description}{how_to_apply}"
+                file_hash = get_file_hash(content_str.encode('utf-8'))
             
-            progress.progress(10, text="Generating PDF document...")
-            
-            service_content = {
-                "service_name": gen_data.get("service_name", ""),
-                "service_description": gen_data.get("service_description", ""),
-                "how_to_apply": gen_data.get("how_to_apply", ""),
-                "eligibility_criteria": gen_data.get("eligibility_criteria", ""),
-                "required_docs": gen_data.get("required_docs", ""),
-                "operator_tips": gen_data.get("operator_tips", ""),
-                "troubleshooting": gen_data.get("troubleshooting", ""),
-                "service_link": gen_data.get("service_link", ""),
-                "fees_and_timeline": gen_data.get("fees_and_timeline", ""),
-            }
-
-            pdf_path = generate_service_pdf(service_content)
-            
-            with open(pdf_path, "rb") as pdf_file:
-                pdf_bytes = pdf_file.read()
-            file_hash = get_file_hash(pdf_bytes)
-            
-            status_check, existing_data = check_for_updates(service_name, file_hash)
-            
-            if status_check == "UPDATE_NEEDED" and existing_data:
-                current_ver = existing_data.get('current_version', '1.0')
-                service_version = get_next_version(current_ver)
-                st.success(f"🔄 Generating Version {service_version}...")
-            elif status_check == "UP_TO_DATE" and existing_data:
-                service_version = existing_data.get('current_version', '1.0')
-                st.info(f"ℹ️ Generating video for existing version v{service_version}...")
-            else:
-                service_version = "1.0"
-                st.info("🆕 Generating initial version...")
-
-            pages = extract_raw_content(pdf_path)
-            raw_text = "\n".join(line for page in pages for line in page["lines"])
-
-        with status.container():
-            st.markdown('<div class="status-box">🧠 Structuring training slides using AI...</div>', unsafe_allow_html=True)
-        
-        progress.progress(20, text="Processing content with AI...")
-        slides_response = generate_slides_from_raw(raw_text)
-        slides = slides_response["slides"]
-
-        st.info(f"✅ Generated {len(slides)} training slides")
-
-        for i, slide in enumerate(slides):
-            with status.container():
-                st.markdown(f'<div class="status-box">🎬 Creating slide {i + 1} of {len(slides)}: {slide["title"]}</div>', unsafe_allow_html=True)
-
-            progress.progress(int(20 + (i / len(slides) * 60)), text=f"Processing slide {i + 1}/{len(slides)}...")
-
             try:
-                narration = " ".join(slide["bullets"])
-                
-                with status.container():
-                    st.markdown(f'<div class="status-box">🎙️ Generating narration audio for slide {i + 1}...</div>', unsafe_allow_html=True)
-                audio = asyncio.run(text_to_speech(narration, voice=selected_voice))
-                audio_paths.append(audio)
-
-                with status.container():
-                    st.markdown(f'<div class="status-box">🖼️ Fetching image for slide {i + 1}...</div>', unsafe_allow_html=True)
-                try:
-                    image = fetch_and_save_photo(slide["image_keyword"])
-                except Exception as img_error:
-                    logging.warning(f"Image fetch failed: {img_error}. Using fallback.")
-                    fallback = os.path.join("images", "fallback_video.jpg")
-                    if not os.path.exists(fallback):
-                        try:
-                            from PIL import Image
-                            os.makedirs("images", exist_ok=True)
-                            img = Image.new("RGB", (1280, 720), (30, 30, 40))
-                            img.save(fallback, "JPEG", quality=90)
-                        except Exception:
-                            pass
-                    image = fallback if os.path.exists(fallback) else os.path.join("assets", "default_background.jpg")
-
-                with status.container():
-                    st.markdown(f'<div class="status-box">🎥 Compositing slide {i + 1}...</div>', unsafe_allow_html=True)
-                clip = create_slide(slide["title"], slide["bullets"], image, audio)
-                
-                with status.container():
-                    st.markdown(f'<div class="status-box">🧑‍🏫 Adding avatar to slide {i + 1}...</div>', unsafe_allow_html=True)
-                clip = add_avatar_to_slide(clip, audio_duration=clip.duration)
-                video_clips.append(clip)
-                
-                logging.info(f"Successfully created slide {i + 1}/{len(slides)}")
+                service_data = register_service_version(
+                    service_name=final_service_name,
+                    file_hash=file_hash,
+                    video_path=final_path,
+                    pdf_path=pdf_path,
+                    source_type="uploaded" if uploaded_pdf else "generated"
+                )
+                logging.info(f"Service version registered: {service_data}")
+            except Exception as reg_error:
+                logging.error(f"Failed to register service version: {reg_error}")
+                st.warning("⚠️ Video created but version registration failed. The video may not appear in version history.")
             
-            except Exception as slide_error:
-                logging.error(f"Error creating slide {i + 1}: {slide_error}")
-                st.error(f"⚠️ Warning: Failed to create slide {i + 1}. Skipping...")
-                continue
+            # Update service_version if it wasn't set
+            if not service_version:
+                service_version = service_data.get('current_version', '1.0')
 
-        with status.container():
-            st.markdown('<div class="status-box">🎞️ Rendering final video...</div>', unsafe_allow_html=True)
-        
-        progress.progress(90, text="Finalizing video...")
-        
-        if not video_clips:
-            logging.error("No video clips were created successfully")
-            st.error("❌ Failed to create video: No slides were generated successfully.")
+            progress.progress(100, text="✅ Complete!")
+            st.session_state["video_path"] = final_path
+            st.session_state["audio_paths"] = audio_paths
+            st.session_state["service_version"] = service_version
+            st.session_state["service_data"] = service_data
+
+            # Clean up session state for update confirmation
             st.session_state.update_confirmed = False
+            st.session_state.pending_update = None
             st.session_state.pending_generation_data = None
-            return
+
+            status.empty()
+            progress.empty()
+
+            st.success("✅ Training video generated successfully!")
+            st.balloons()
+
+        except Exception as e:
+            logging.error(f"Video generation error: {e}")
+            st.error(f"❌ Error generating video: {str(e)}")
+            st.error("Please check your inputs and try again.")
+
+    # ---------------- DISPLAY RESULT ----------------
+    if "video_path" in st.session_state:
+        st.markdown("---")
+        st.markdown("## 🎬 Generated Training Video")
         
-        final_service_name = service_name or "BSK_Service"
+        # Show version info if available
+        if "service_version" in st.session_state:
+            version = st.session_state["service_version"]
+            service_data = st.session_state.get("service_data", {})
+            service_name_display = service_data.get('service_name', 'Service')
+            
+            # Create a prominent version badge
+            col_ver1, col_ver2, col_ver3 = st.columns([2, 2, 2])
+            with col_ver1:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            padding: 1rem; border-radius: 10px; text-align: center; color: white; font-weight: bold;">
+                    📌 Version {version}
+                </div>
+                """, unsafe_allow_html=True)
+            with col_ver2:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                            padding: 1rem; border-radius: 10px; text-align: center; color: white; font-weight: bold;">
+                    📋 {service_name_display}
+                </div>
+                """, unsafe_allow_html=True)
+            with col_ver3:
+                last_updated = service_data.get('last_updated', '')[:10] if service_data.get('last_updated') else 'N/A'
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                            padding: 1rem; border-radius: 10px; text-align: center; color: white; font-weight: bold;">
+                    📅 {last_updated}
+                </div>
+                """, unsafe_allow_html=True)
+
+        with open(st.session_state["video_path"], "rb") as f:
+            st.video(f.read())
+
+        col1, col2 = st.columns([3, 1])
         
-        try:
-            final_path = combine_slides_and_audio(
-                video_clips, audio_paths, 
-                service_name=final_service_name,
-                version=service_version
+        with col1:
+            st.download_button(
+                "📥 Download Video",
+                data=open(st.session_state["video_path"], "rb").read(),
+                file_name=os.path.basename(st.session_state["video_path"]),
+                mime="video/mp4",
+                use_container_width=True
             )
-            logging.info(f"Video successfully rendered: {final_path}")
-        except Exception as render_error:
-            logging.error(f"Video rendering failed: {render_error}")
-            st.error(f"❌ Video rendering failed: {str(render_error)}")
-            st.session_state.update_confirmed = False
-            st.session_state.pending_generation_data = None
-            return
-
-        try:
-            service_data = register_service_version(
-                service_name=final_service_name,
-                file_hash=file_hash,
-                video_path=final_path,
-                pdf_path=pdf_path,
-                source_type="uploaded" if is_pdf else "generated"
-            )
-            logging.info(f"Service version registered: {service_data}")
-        except Exception as reg_error:
-            logging.error(f"Failed to register service version: {reg_error}")
-            st.warning("⚠️ Video created but version registration failed.")
         
-        if not service_version:
-            service_version = service_data.get('current_version', '1.0')
-
-        progress.progress(100, text="✅ Complete!")
-        st.session_state["video_path"] = final_path
-        st.session_state["audio_paths"] = audio_paths
-        st.session_state["service_version"] = service_version
-        st.session_state["service_data"] = service_data
-
-        st.session_state.update_confirmed = False
-        st.session_state.pending_generation_data = None
-
-        status.empty()
-        progress.empty()
-
-        st.success("✅ Training video generated successfully!")
-        st.balloons()
-        st.rerun()
-
-    except Exception as e:
-        logging.error(f"Video generation error: {e}")
-        st.error(f"❌ Error generating video: {str(e)}")
-        st.session_state.update_confirmed = False
-        st.session_state.pending_generation_data = None
+        with col2:
+            if st.button("🔄 Generate New", use_container_width=True):
+                st.session_state.clear()
+                st.rerun()
 
 
-def display_generated_video():
-    st.markdown("---")
-    st.markdown("## 🎬 Generated Training Video")
-    
-    if "service_version" in st.session_state:
-        version = st.session_state["service_version"]
-        service_data = st.session_state.get("service_data", {})
-        service_name_display = service_data.get('service_name', 'Service')
-        
-        col_ver1, col_ver2, col_ver3 = st.columns([2, 2, 2])
-        with col_ver1:
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                        padding: 1rem; border-radius: 10px; text-align: center; color: white; font-weight: bold;">
-                📌 Version {version}
-            </div>
-            """, unsafe_allow_html=True)
-        with col_ver2:
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
-                        padding: 1rem; border-radius: 10px; text-align: center; color: white; font-weight: bold;">
-                📋 {service_name_display}
-            </div>
-            """, unsafe_allow_html=True)
-        with col_ver3:
-            last_updated = service_data.get('last_updated', '')[:10] if service_data.get('last_updated') else 'N/A'
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
-                        padding: 1rem; border-radius: 10px; text-align: center; color: white; font-weight: bold;">
-                📅 {last_updated}
-            </div>
-            """, unsafe_allow_html=True)
-
-    with open(st.session_state["video_path"], "rb") as f:
-        st.video(f.read())
-
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        st.download_button(
-            "📥 Download Video",
-            data=open(st.session_state["video_path"], "rb").read(),
-            file_name=os.path.basename(st.session_state["video_path"]),
-            mime="video/mp4",
-            use_container_width=True
-        )
-    
-    with col2:
-        if st.button("🔄 Generate New", use_container_width=True):
-            st.session_state.clear()
-            st.rerun()
-
-
+# -------------------------------------------------
+# EXISTING VIDEOS PAGE
+# -------------------------------------------------
 def show_existing_videos_page():
     st.title("📂 Existing Training Videos")
     st.markdown("**Browse and view previously generated training videos**")
     st.markdown("---")
 
+    # Load version registry
     from utils.version_utils import get_all_services, get_version_history
     
     output_dir = "output_videos"
@@ -658,13 +1260,18 @@ def show_existing_videos_page():
         st.info("📭 No videos available yet. Generate some videos first!")
         return
 
+    # Get all registered services
     services = get_all_services()
     
+    # Group videos by service
     service_groups = {}
+    unregistered_videos = []
     
     for video_file in videos:
         video_path = os.path.join(output_dir, video_file)
+        matched = False
         
+        # Try to match with registered services
         for normalized_name, service_data in services.items():
             if service_data.get("video_path") == video_path:
                 service_name = service_data.get("service_name", normalized_name)
@@ -675,11 +1282,17 @@ def show_existing_videos_page():
                     "path": video_path,
                     "data": service_data
                 })
+                matched = True
                 break
+        
+        if not matched:
+            unregistered_videos.append(video_file)
     
+    # Display service groups
     if service_groups:
         st.success(f"✅ Found {len(services)} registered service(s) with {len(videos)} video(s)")
         
+        # Service selector
         service_names = sorted(service_groups.keys())
         selected_service = st.selectbox(
             "📋 Select a Service:",
@@ -690,8 +1303,10 @@ def show_existing_videos_page():
         if selected_service:
             service_videos = service_groups[selected_service]
             
+            # Get version history
             history = get_version_history(selected_service)
             
+            # Show version info
             if history:
                 st.markdown("### 📊 Version History")
                 current_version = history[0] if history else None
@@ -724,6 +1339,7 @@ def show_existing_videos_page():
                         </div>
                         """, unsafe_allow_html=True)
                 
+                # Version history table
                 if len(history) > 1:
                     st.markdown("---")
                     st.markdown("### 📜 All Versions")
@@ -753,6 +1369,7 @@ def show_existing_videos_page():
                             </div>
                             """, unsafe_allow_html=True)
             
+            # Video selector for this service
             video_options = [v["file"] for v in service_videos]
             selected_video = st.selectbox(
                 "🎥 Select Version:",
@@ -769,7 +1386,8 @@ def show_existing_videos_page():
                     video_bytes = f.read()
                     st.video(video_bytes)
                 
-                file_size = os.path.getsize(path) / (1024 * 1024)
+                # File info
+                file_size = os.path.getsize(path) / (1024 * 1024)  # Convert to MB
                 video_data = selected_video_data.get("data", {})
                 version = video_data.get("current_version", "N/A")
                 
@@ -787,6 +1405,7 @@ def show_existing_videos_page():
                     use_container_width=True
                 )
     else:
+        # Fallback to simple list if no registry
         st.success(f"✅ Found {len(videos)} training video(s)")
         
         selected = st.selectbox(
@@ -803,7 +1422,8 @@ def show_existing_videos_page():
                 video_bytes = f.read()
                 st.video(video_bytes)
             
-            file_size = os.path.getsize(path) / (1024 * 1024)
+            # File info
+            file_size = os.path.getsize(path) / (1024 * 1024)  # Convert to MB
             st.caption(f"📊 File size: {file_size:.2f} MB")
             
             st.download_button(
@@ -813,7 +1433,19 @@ def show_existing_videos_page():
                 mime="video/mp4",
                 use_container_width=True
             )
+    
+    # Show unregistered videos if any
+    if unregistered_videos:
+        with st.expander("📦 Unregistered Videos (Legacy)"):
+            st.info(f"Found {len(unregistered_videos)} video(s) not in version registry")
+            for video_file in unregistered_videos:
+                st.text(f"• {video_file}")
 
 
+# -------------------------------------------------
+# RUN
+# -------------------------------------------------
 if __name__ == "__main__":
     main()
+
+
